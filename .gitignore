@@ -1,0 +1,9 @@
+# Ignore everything
+*
+# Don't ignore rmd and pdf file
+!.gitignore
+!references.bib
+!bayes.rmd
+!bayes.pdf
+
+.Rproj.user

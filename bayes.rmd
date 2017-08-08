@@ -1,0 +1,78 @@
+---
+output: 
+  pdf_document:
+    fig_caption: true
+    keep_tex: true
+    latex_engine: pdflatex
+    number_sections: true
+header-includes:
+- \usepackage[english]{babel}
+- \usepackage{setspace}
+- \usepackage{bm}
+- \hyphenation{}
+- \pagenumbering{arabic}
+- \numberwithin{equation}{section}
+- \newcommand{\E}{\mathbb{E}}
+- \newcommand{\R}{\mathbb{R}}
+- \newcommand{\argmax}{\text{argmax}}
+fontsize: 10pt
+geometry: a4paper, left=30mm, right=30mm, top=20mm, bottom=20mm, includefoot
+bibliography: references.bib
+documentclass: article
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r libraries, echo=FALSE, warning=FALSE, message=FALSE}
+library(MASS)
+library(mixtools)
+library(plyr)
+library(xtable)
+```
+
+<!-- Titlepage -->
+\thispagestyle{empty}
+
+\begin{raggedright}
+  Freie Universität Berlin\\
+  Chair of Statistics\\
+  Location: Berlin\\
+  Summer Term 2017\\
+  Lecture: Einführung in die Bayes-Statistik\\
+  Examiner: Dr. Florian Meinfelder
+\end{raggedright}
+
+\vspace*{\fill}
+  \begin{center}
+    \textbf{\Large{Program leave-one-out posterior predictive checking in R}}%
+  \end{center}
+\vfill
+
+\begin{raggedleft}
+  Johannes Brinkmann (), \href{mailto:jojo-brinkmann@gmx.de}{jojo-brinkmann@gmx.de}\\
+  Carlo Michaelis (5043128), \href{mailto:carlo.michaelis@gmail.com}{carlo.michaelis@gmail.com}\\
+  Max Reinhardt (), \href{mailto:maxreinhardt@me.com}{max\_reinhardt@me.com}\\
+  Adrian Rolf (), \href{mailto:adrian.rolf@gmx.de}{adrian.rolf@gmx.de}\\
+  \ \\
+  Master Statistics\\
+  \today\\
+\end{raggedleft}
+
+\newpage
+
+<!-- Table of Contents -->
+\tableofcontents
+\newpage
+
+<!-- List of Figures and Tables -->
+\listoffigures
+\listoftables
+\newpage
+
+<!-- Document Body -->
+# Introduction
+
+<!-- References -->
+# References
