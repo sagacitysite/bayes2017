@@ -81,75 +81,125 @@ library(mvtnorm)
 # Swiss data
 dat <- swiss
 
-# Sample Size
-n = nrow(dat)
-
 # Response variable
-Y = dat$Fertility
+Y <- dat$Fertility
 
 # Design matrix
-X = matrix(c(rep(1,n), dat$Education, dat$Agriculture), nrow=n)
-p = ncol(X)
+n <- nrow(dat)
+X <- matrix(c(rep(1,n), dat$Education, dat$Agriculture), nrow=n)
+p <- ncol(X)
 
 # Number of samples
-b <- 1000  # Burn in
-R <- 10000 # Random draws to evaluate
+b <- 50  # Burn in
+R <- 500 # Random draws to evaluate
 B <- R + b
 
-# Variables to store the samples in 
-beta = matrix(NA, nrow = B, ncol = p)
-sigma = c(1, rep(NA, B))
+plotSampling <- function(betas, sigma, traces = TRUE, density = TRUE) {
+  # Get number of parameters and adjust plot frame height
+  q <- ncol(betas) + 1
+  frameRows <- round(q/2+0.5)
+  
+  # Traces
+  if(traces == TRUE) {
+    par(mfrow = c(2,frameRows))
+    for(i in 1:ncol(betas)) {
+      plot(betas[,i], type='l', ylab=bquote(beta[.(i-1)]), main=bquote("Trace of" ~ beta[.(i-1)]))
+    }
+    plot(sigma, type='l', ylab=bquote(sigma^2), main=bquote("Trace of" ~ sigma^2))
+  }
+  
+  # Marginal posterior densities (remove burn in)
+  if(density == TRUE) {
+    # Function to draw plot
+    drawHistDensity <- function(para, para_name) {
+      # para     : Parameter (e.b. Beta, Sigma)
+      # para_name: Title of plot
+      
+      # Estimate density for parameter values
+      density <- density(para)
+      
+      # Draw histogram and add estimated density line
+      hist(para, freq = FALSE, ylim = c(0,max(density$y)), xlab = para_name,
+           ylab="Marginal posterior density", main = NULL)
+      lines(density, col="blue")
+    }
+    
+    # Adjust frame and plot all parameters
+    par(mfrow = c(2,frameRows))
+    for(i in 1:ncol(betas)) {
+      drawHistDensity(betas[-(1:b),i], bquote(beta[.(i-1)]))
+    }
+    drawHistDensity(sigma[-(1:b)], bquote(sigma))
+  }
+}
 
 # The Gibbs Sampler
-for(i in 1:B){
+gibbsSampler <- function(X, Y, B, show = FALSE) {
+  # Size of design matrix
+  n <- nrow(X)
+  p <- ncol(X)
   
-  # LSE of beta
-  V = solve(t(X)%*%X) # (X^T X)^-1
-  beta_hat = V%*%t(X)%*%Y # (X^T X)^-1 X^T Y
+  # Variables to store the samples in 
+  betas <- matrix(NA, nrow = B, ncol = p)
+  sigma <- c(1, rep(NA, B))
   
-  # LSE of sigma
-  sigma_hat = t(Y-X%*%beta_hat)%*%(Y-X%*%beta_hat)/(n-p)
+  # Sampling
+  for(i in 1:B){
+    # OLS of beta
+    V <- solve(t(X)%*%X)     # (X^T X)^-1
+    beta_hat <- V%*%t(X)%*%Y # (X^T X)^-1 X^T Y
+    
+    # OLS of sigma
+    sigma_hat <- t(Y-X%*%beta_hat)%*%(Y-X%*%beta_hat)/(n-p)
+    
+    # Sample beta from the full conditional 
+    betas[i,] <- rmvnorm(1,beta_hat,sigma[i]*V)
+    
+    # Sample sigma from the full conditional
+    sigma[i+1] <- 1/rgamma(1,(n-p)/2,(n-p)*sigma_hat/2)
+  }
   
-  # Sample beta from the full conditional 
-  beta[i,] = rmvnorm(1,beta_hat,sigma[i]*V)
+  if(show == TRUE) {
+    plotSampling(betas, sigma)
+  }
   
-  # Sample sigma from the full conditional
-  sigma[i+1] = 1/rgamma(1,(n-p)/2,(n-p)*sigma_hat/2)
+  return(list(betas = betas, sigma = sigma))
 }
 
-# Plot traces
-par(mfrow=c(2,2))
-plot(beta[,1],type='l',ylab=expression(beta[0]),main=expression("Trace of "*beta[0]))
-plot(beta[,2],type='l',ylab=expression(beta[1]),main=expression("Trace of "*beta[1]))
-plot(beta[,3],type='l',ylab=expression(beta[2]),main=expression("Trace of "*beta[2]))
-plot(sigma,type='l',ylab=expression(sigma^2),main=expression("Trace of "*sigma^2))
-
-# Marginal posterior densities
-
-drawHistDensity <- function(para, para_name) {
-  # para     : Parameter (e.b. Beta, Sigma)
-  # para_name: Title of plot
+crossValidation <- function(X, Y, B) {
+  Yhat <- rep(NA, n)
+  betas <- matrix(NA, nrow = n, ncol = p)
   
-  # Estimate density for parameter values
-  density <- density(para)
+  for(i in 1:n) {
+    # Remove i-th row from data
+    Xi <- X[-i,]
+    Yi <- Y[-i]
+    
+    # Run gibbs sampler to get sampled parameters and plot results from first run
+    res <- gibbsSampler(Xi, Yi, B, ifelse(i == 1, TRUE, FALSE))
+    
+    # Calculate posterior mean from sampled betas
+    betas[i,] <- apply(res$betas, 2, mean)
+    
+    # Predict value with posterior mean
+    Yhat[i] <- X[i,]%*%betas[i,]
+  }
   
-  # Draw histogram and add estimated density line
-  hist(para, freq = FALSE, ylim = c(0,max(density$y)), xlab = para_name,
-       ylab="Marginal posterior density", main = NULL)
-  lines(density, col="blue")
+  # Calculate beta estimate
+  beta_cv <- mean(betas)
+  
+  # Calculate MSE
+  mse <- sum((Y-Yhat)^2)
+  
+  return(list(betas = betas, mse = mse))
 }
 
-par(mfrow=c(2,2))
-drawHistDensity(beta[-(1:b),1], expression(beta[0]))
-drawHistDensity(beta[-(1:b),2], expression(beta[1]))
-drawHistDensity(beta[-(1:b),3], expression(beta[2]))
-drawHistDensity(sigma[-(1:b)], expression(sigma))
+res <- crossValidation(X, Y, B)
 
-# Posterior means
-cat(paste("Posterior means:\nbeta_0:", mean(beta[,1]), "\nbeta_1:", mean(beta[,2]), "\nbeta_2:", mean(beta[,3])))
+print(res$mse)
 
 # Compare with frequentist linear regression
-lm(dat$Fertility ~ dat$Education + dat$Agriculture)
+#lm(dat$Fertility ~ dat$Education + dat$Agriculture)
 
 ```
 
