@@ -120,7 +120,7 @@ plotSampling <- function(betas, sigma, traces = TRUE, density = TRUE) {
       
       # Draw histogram and add estimated density line
       hist(para, freq = FALSE, ylim = c(0,max(density$y)), xlab = para_name,
-           ylab="Marginal posterior density", main = NULL)
+           ylab=NULL, main = "Marginal posterior density")
       lines(density, col="blue")
     }
     
