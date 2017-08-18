@@ -78,8 +78,6 @@ library(mvtnorm)
 # Code
 
 ```{r}
-library(mvtnorm)
-
 plotSampling <- function(betas, sigma, traces = FALSE, density = FALSE) {
   # Get number of parameters and adjust plot frame height
   q <- ncol(betas) + 1
@@ -120,7 +118,7 @@ plotSampling <- function(betas, sigma, traces = FALSE, density = FALSE) {
 }
 
 # The Gibbs Sampler
-gibbsSampler <- function(X, Y, B, ...) {
+gibbsSampler <- function(X, Y, B) {
   # Size of design matrix
   n <- nrow(X)
   p <- ncol(X)
@@ -145,8 +143,6 @@ gibbsSampler <- function(X, Y, B, ...) {
     sigma[i+1] <- 1/rgamma(1,(n-p)/2,(n-p)*sigma_hat/2)
   }
   
-  plotSampling(betas, sigma, ...)
-  
   return(list(betas = betas, sigma = sigma))
 }
 
@@ -163,11 +159,12 @@ crossValidation <- function(X, Y, B, ...) {
     Xi <- X[-i,]
     Yi <- Y[-i]
     
-    # Run gibbs sampler to get sampled parameters and plot results from first run
+    # Run gibbs sampler to get sampled parameters
+    res <- gibbsSampler(Xi, Yi, B)
+    
+    # Plot results from last run
     if(i == n) {
-      res <- gibbsSampler(Xi, Yi, B, ...)
-    } else {
-      res <- gibbsSampler(Xi, Yi, B)
+      plotSampling(res$betas, res$sigma, ...)
     }
     
     # Calculate posterior mean from sampled betas
@@ -180,22 +177,28 @@ crossValidation <- function(X, Y, B, ...) {
   # Calculate beta estimate
   beta_cv <- colMeans(betas)
   
-  # Calculate MSE
-  mse <- sum((Y-Yhat)^2)
-  
-  return(list(betas = beta_cv, mse = mse))
+  # Return betas and distances
+  return(list(betas = betas, dist = (Y-Yhat)^2))
 }
 
 bayesModelEvaluation <- function(models, Y, B, ...) {
   # Evaluate multiple models and return results from all models
+  n <- length(Y)
   k <- length(models)
   results <- list() 
   for(i in 1:k) {
     if(i == k) {
-      results[[i]] <- crossValidation(models[[i]], Y, B, ...)
+      # Plot everything for last model
+      res <- crossValidation(models[[i]], Y, B, ...)
+      par(mfrow = c(1,1))
+      barplot(res$dist, xlab = "Data point", ylab = "Distance", names.arg = seq(1,n),
+              main="Squared distance between estimate and real value")
     } else {
-      results[[i]] <- crossValidation(models[[i]], Y, B)
+      res <- crossValidation(models[[i]], Y, B)
     }
+    # Calculate beta estimates & MSE and add to results
+    results[[i]] <- list(beta_est = colMeans(res$betas),
+                         mse = sum(res$dist))
   }
   return(results)
 }
@@ -235,7 +238,6 @@ res <- bayesModelEvaluation(models, Y, B, traces = FALSE, density = TRUE)
 MSEs <- sapply(res, function(el) { return(el$mse) })
 par(mfrow = c(1,1))
 barplot(MSEs, xlab = "Models", ylab = "MSE", names.arg = seq(1,length(models)))
-
 ```
 
 <!-- References -->
