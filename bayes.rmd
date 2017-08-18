@@ -78,30 +78,16 @@ library(mvtnorm)
 # Code
 
 ```{r}
-# Swiss data
-dat <- swiss
-
-# Response variable
-Y <- dat$Fertility
-
-# Design matrix
-n <- nrow(dat)
-X <- matrix(c(rep(1,n), dat$Education, dat$Agriculture), nrow=n)
-p <- ncol(X)
-
-# Number of samples
-b <- 50  # Burn in
-R <- 500 # Random draws to evaluate
-B <- R + b
+library(mvtnorm)
 
 plotSampling <- function(betas, sigma, traces = TRUE, density = TRUE) {
   # Get number of parameters and adjust plot frame height
   q <- ncol(betas) + 1
-  frameRows <- round(q/2+0.5)
+  frameRows <- round(q/2+0.1)
   
   # Traces
   if(traces == TRUE) {
-    par(mfrow = c(2,frameRows))
+    par(mfrow = c(frameRows,2))
     for(i in 1:ncol(betas)) {
       plot(betas[,i], type='l', ylab=bquote(beta[.(i-1)]), main=bquote("Trace of" ~ beta[.(i-1)]))
     }
@@ -125,7 +111,7 @@ plotSampling <- function(betas, sigma, traces = TRUE, density = TRUE) {
     }
     
     # Adjust frame and plot all parameters
-    par(mfrow = c(2,frameRows))
+    par(mfrow = c(frameRows,2))
     for(i in 1:ncol(betas)) {
       drawHistDensity(betas[-(1:b),i], bquote(beta[.(i-1)]))
     }
@@ -134,7 +120,7 @@ plotSampling <- function(betas, sigma, traces = TRUE, density = TRUE) {
 }
 
 # The Gibbs Sampler
-gibbsSampler <- function(X, Y, B, show = FALSE) {
+gibbsSampler <- function(X, Y, B, ...) {
   # Size of design matrix
   n <- nrow(X)
   p <- ncol(X)
@@ -159,14 +145,16 @@ gibbsSampler <- function(X, Y, B, show = FALSE) {
     sigma[i+1] <- 1/rgamma(1,(n-p)/2,(n-p)*sigma_hat/2)
   }
   
-  if(show == TRUE) {
-    plotSampling(betas, sigma)
-  }
+  plotSampling(betas, sigma, ...)
   
   return(list(betas = betas, sigma = sigma))
 }
 
-crossValidation <- function(X, Y, B) {
+crossValidation <- function(X, Y, B, ...) {
+  # Size of design matrix
+  n <- nrow(X)
+  p <- ncol(X)
+  
   Yhat <- rep(NA, n)
   betas <- matrix(NA, nrow = n, ncol = p)
   
@@ -176,7 +164,11 @@ crossValidation <- function(X, Y, B) {
     Yi <- Y[-i]
     
     # Run gibbs sampler to get sampled parameters and plot results from first run
-    res <- gibbsSampler(Xi, Yi, B, ifelse(i == 1, TRUE, FALSE))
+    if(i == 1) {
+      res <- gibbsSampler(Xi, Yi, B, ...)
+    } else {
+      res <- gibbsSampler(Xi, Yi, B, traces = FALSE, density = FALSE)
+    }
     
     # Calculate posterior mean from sampled betas
     betas[i,] <- apply(res$betas, 2, mean)
@@ -186,20 +178,58 @@ crossValidation <- function(X, Y, B) {
   }
   
   # Calculate beta estimate
-  beta_cv <- mean(betas)
+  beta_cv <- colMeans(betas)
   
   # Calculate MSE
   mse <- sum((Y-Yhat)^2)
   
-  return(list(betas = betas, mse = mse))
+  return(list(betas = beta_cv, mse = mse))
 }
 
-res <- crossValidation(X, Y, B)
+bayesModelEvaluation <- function(models, Y, B, ...) {
+  # Evaluate multiple models and return results from all models
+  results <- list() 
+  for(i in 1:length(models)) {
+    results[[i]] <- crossValidation(models[[i]], Y, B, ...)
+  }
+  return(results)
+}
 
-print(res$mse)
+# Swiss data
+dat <- swiss
 
-# Compare with frequentist linear regression
-#lm(dat$Fertility ~ dat$Education + dat$Agriculture)
+# Response variable
+Y <- dat$Fertility
+
+# Design matrix
+n <- nrow(dat)
+X <- matrix(c(rep(1,n), dat$Education, dat$Agriculture), nrow=n)
+
+models <- list(
+  matrix(c(rep(1,n), dat$Education), nrow=n),
+  matrix(c(rep(1,n), dat$Agriculture), nrow=n),
+  matrix(c(rep(1,n), dat$Examination), nrow=n),
+  matrix(c(rep(1,n), dat$Catholic), nrow=n),
+  matrix(c(rep(1,n), dat$Education, dat$Agriculture), nrow=n),
+  matrix(c(rep(1,n), dat$Education, dat$Examination), nrow=n),
+  matrix(c(rep(1,n), dat$Education, dat$Catholic), nrow=n),
+  matrix(c(rep(1,n), dat$Education, dat$Agriculture, dat$Examination), nrow=n),
+  matrix(c(rep(1,n), dat$Education, dat$Agriculture, dat$Catholic), nrow=n),
+  matrix(c(rep(1,n), dat$Education, dat$Examination, dat$Catholic), nrow=n),
+  matrix(c(rep(1,n), dat$Education, dat$Agriculture, dat$Examination ,dat$Catholic), nrow=n)
+)
+
+# Number of samples
+b <- 50  # Burn in
+R <- 500 # Random draws to evaluate
+B <- R + b
+
+res <- bayesModelEvaluation(models, Y, B, traces = FALSE, density = TRUE)
+
+# Plot Mean Squared Errors
+MSEs <- sapply(res, function(el) { return(el$mse) })
+par(mfrow = c(1,1))
+barplot(MSEs, xlab = "Models", ylab = "MSE", names.arg = seq(1,length(models)))
 
 ```
 
