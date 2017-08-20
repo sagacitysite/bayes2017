@@ -5,6 +5,8 @@ output:
     keep_tex: true
     latex_engine: pdflatex
     number_sections: true
+    fig_height: 3
+    fig_width: 10
 header-includes:
 - \usepackage[english]{babel}
 - \usepackage{setspace}
@@ -77,55 +79,21 @@ library(mvtnorm)
 
 # Code
 
-```{r}
-plotSampling <- function(betas, sigma) {
-  # Get number of parameters and adjust plot frame height
-  q <- ncol(betas) + 1
-  frameRows <- round(q/2+0.1)
-  
-  # Traces
-  par(mfrow = c(frameRows,2))
-  for(i in 1:ncol(betas)) {
-    plot(betas[,i], type='l', ylab=bquote(beta[.(i-1)]), main=bquote("Trace of" ~ beta[.(i-1)]))
-  }
-  plot(sigma, type='l', ylab=bquote(sigma^2), main=bquote("Trace of" ~ sigma^2))
-  
-  # Marginal posterior densities (remove burn in)
-  
-  # Function to draw plot
-  drawHistDensity <- function(para, para_name) {
-    # para     : Parameter (e.b. Beta, Sigma)
-    # para_name: Title of plot
-    
-    # Estimate density for parameter values
-    density <- density(para)
-    
-    # Draw histogram and add estimated density line
-    hist(para, freq = FALSE, ylim = c(0,max(density$y)), xlab = para_name,
-         ylab=NULL, main = "Marginal posterior density")
-    lines(density, col="blue")
-    
-    # Posterior mean
-    # TODO abline
-  }
-  
-  # Adjust frame and plot all parameters
-  par(mfrow = c(frameRows,2))
-  for(i in 1:ncol(betas)) {
-    drawHistDensity(betas[-(1:b),i], bquote(beta[.(i-1)]))
-  }
-  drawHistDensity(sigma[-(1:b)], bquote(sigma))
-}
+## General code
 
-# The Gibbs Sampler
-gibbsSampler <- function(X, Y, B, b = NULL) {
+The Gibbs sampler
+
+```{r gibbsSampler}
+gibbsSampler <- function(X, Y, R, b = 0, initSigma = 1) {
+  B <- R + b
+  
   # Size of design matrix
   n <- nrow(X)
   p <- ncol(X)
   
-  # Variables to store the samples in 
-  betas <- matrix(NA, nrow = B, ncol = p)
-  sigma <- c(1, rep(NA, B))
+  # Variables to store the samples in (initalize sigma with initSigma)
+  betas <- matrix(nrow = B, ncol = p)
+  sigma <- c(initSigma, rep(NA, B-1))
   
   # Sampling
   for(i in 1:B){
@@ -137,166 +105,266 @@ gibbsSampler <- function(X, Y, B, b = NULL) {
     sigma_hat <- t(Y-X%*%beta_hat)%*%(Y-X%*%beta_hat)/(n-p)
     
     # Sample beta from the full conditional 
-    betas[i,] <- rmvnorm(1,beta_hat,sigma[i]*V)
+    betas[i,] <- rmvnorm(1, beta_hat, sigma[i]*V)
     
     # Sample sigma from the full conditional
-    sigma[i+1] <- 1/rgamma(1,(n-p)/2,(n-p)*sigma_hat/2)
+    if(i < B) {
+      sigma[i+1] <- 1/rgamma(1, (n-p)/2, (n-p)*sigma_hat/2)
+    }
   }
   
-  if(!is.null(b)) {
+  # Remove burn in
+  if(b != 0) {
     betas <- betas[-(1:b),]
     sigma <- sigma[-(1:b)]
   }
   
   return(list(betas = betas, sigma = sigma))
 }
+```
 
-pointEstimate <- function(sampleBetas, sampleSigma) {
-  # Calculate posterior mean from sampled betas
-  betas <- apply(sampleBetas, 2, mean)
-  
-  # Calculare posterior mean from sampled sigmas
-  sigma <- mean(sampleSigma)
-  
-  return(list(betas = betas, sigma = sigma))
-}
+Cross Validation function
 
-crossValidation <- function(X, Y, B, ...) {
+```{r crossValidation}
+crossValidation <- function(X, Y, R, b) {
   # Size of design matrix
   n <- nrow(X)
   p <- ncol(X)
+  steps <- length(R)
   
-  Yhati <- rep(NA, n)
-  sigma <- rep(NA, n)
-  betas <- matrix(NA, nrow = n, ncol = p)
+  # Run gibbs sampler to get sampled parameters
+  samples <- lapply(1:n, function(i) gibbsSampler(X[-i,], Y[-i], R[steps], b))
   
-  for(i in 1:n) {
-    # Remove i-th row from data
-    Xi <- X[-i,]
-    Yi <- Y[-i]
-    
-    # Run gibbs sampler to get sampled parameters
-    sample <- gibbsSampler(Xi, Yi, B, ...)
-    
-    # Calculate posterior means and preditcion
-    est <- pointEstimate(sample$betas, sample$sigma)
-    betas[i,] <- est$betas
-    sigma[i] <- est$sigma
-    
-    # Predict value with posterior mean
-    Yhati[i] <- X[i,]%*%betas[i,]
+  # Initalize lists
+  Sigma <- list()
+  Betas <- list()
+  Yhati <- list()
+  
+  # Calculate sigma, betas and Yhati for every step
+  for(k in 1:steps) {
+    Sigma[[k]] <- sapply(samples, function(sample) mean(sample$sigma[1:R[k]]))
+    Betas[[k]] <- sapply(samples, function(sample) colMeans(sample$betas[1:R[k],]))
+    Yhati[[k]] <- sapply(1:n, function(i) X[i,]%*%Betas[[k]][,i])
   }
   
-  # Return betas and distances
-  return(list(Yhati = Yhati, betas = betas, sigma = sigma))
+  return(list(Sigma = Sigma, Betas = Betas, Yhati = Yhati))
 }
+```
 
-bayesModelEvaluation <- function(models, Y, B, ...) {
+## Model evaluaion
+
+```{r modelEvaluationFunction}
+bayesModelEvaluation <- function(models, Y, R, b) {
   # Evaluate multiple models and return results from all models
+  n <- length(Y)
   k <- length(models)
-  results <- list()
-  for(i in 1:k) {
-    results[[i]] <- crossValidation(models[[i]], Y, B, ...)
-  }
-  return(results)
+  
+  # Cross validate every model
+  results <- lapply(1:k, function(i) crossValidation(models[[i]], Y, R, b))
+  
+  # Calculate Mean Squared Errors
+  MSEs <- sapply(results, function(el) {
+    return((1/(n-nrow(el$Betas[[1]])))*sum((Y-el$Yhati[[1]])^2))
+  })
+  
+  # Plot MSEs
+  par(mfrow = c(1,2))
+  barplot(MSEs, xlab = "Models", ylab = "MSE", names.arg = seq(1,k),
+          main = "Model evaluation using MSE")
+  
+  # Calculate log posterior predictive density (log likelihood)
+  # y ~ N(XB, s^2(X^T X)^-1) = N(Yhat, s^2(X^T X)^-1)
+  LPPDs <- sapply(results, function(eva) sum(log(dnorm(Y, eva$Yhati[[1]], eva$Sigma[[1]]))))
+  
+  # Plot LPPDs
+  barplot(-2*LPPDs, xlab = "Models", ylab = "lppd", names.arg = seq(1,k),
+          main = "Model evaluation using lppd")
+  
+  return(list(MSEs = MSEs, LPPDs = LPPDs))
 }
+```
 
+Run model evaluation with data
+
+```{r modelEvaluation, fig.height=5}
 # Swiss data
 dat <- swiss
 
 # Response variable
 Y <- dat$Fertility
-
-# Design matrix
 n <- nrow(dat)
-X <- matrix(c(rep(1,n), dat$Education, dat$Agriculture), nrow=n)
+
+# Design matrices
 
 models <- list(
-  #matrix(c(rep(1,n), dat$Education), nrow=n),
-  #matrix(c(rep(1,n), dat$Agriculture), nrow=n),
-  #matrix(c(rep(1,n), dat$Examination), nrow=n),
-  #matrix(c(rep(1,n), dat$Catholic), nrow=n),
-  #matrix(c(rep(1,n), dat$Education, dat$Agriculture), nrow=n),
-  #matrix(c(rep(1,n), dat$Education, dat$Examination), nrow=n),
-  #matrix(c(rep(1,n), dat$Education, dat$Catholic), nrow=n),
-  #matrix(c(rep(1,n), dat$Education, dat$Agriculture, dat$Examination), nrow=n),
-  matrix(c(rep(1,n), dat$Education, dat$Agriculture, dat$Catholic), nrow=n)#,
-  #matrix(c(rep(1,n), dat$Education, dat$Examination, dat$Catholic), nrow=n),
-  #matrix(c(rep(1,n), dat$Education, dat$Agriculture, dat$Examination ,dat$Catholic), nrow=n)
+  matrix(c(rep(1,n), dat$Education), nrow=n),
+  matrix(c(rep(1,n), dat$Agriculture), nrow=n),
+  matrix(c(rep(1,n), dat$Examination), nrow=n),
+  matrix(c(rep(1,n), dat$Catholic), nrow=n),
+  matrix(c(rep(1,n), dat$Education, dat$Agriculture), nrow=n),
+  matrix(c(rep(1,n), dat$Education, dat$Examination), nrow=n),
+  matrix(c(rep(1,n), dat$Education, dat$Catholic), nrow=n),
+  matrix(c(rep(1,n), dat$Education, dat$Agriculture, dat$Examination), nrow=n),
+  matrix(c(rep(1,n), dat$Education, dat$Agriculture, dat$Catholic), nrow=n),
+  matrix(c(rep(1,n), dat$Education, dat$Examination, dat$Catholic), nrow=n),
+  matrix(c(rep(1,n), dat$Education, dat$Agriculture, dat$Examination ,dat$Catholic), nrow=n)
 )
 
-# Number of samples
-b <- 100  # Burn in
-R <- 1000 # Random draws to evaluate
-B <- R + b
-
-# 1. Model analysis
-evaData <- bayesModelEvaluation(models, Y, B, b)
-
-# 2. Model evalutaion (mse, lppd)
-MSEs <- sapply(evaData, function(el) (1/n)*sum((Y-el$Yhati)^2))
-
-# Plot Mean Squared Errors
-par(mfrow = c(1,2))
-barplot(MSEs, xlab = "Models", ylab = "MSE", names.arg = seq(1,length(models)))
-
-# Posterior dist is y_i~N(X_-i%*%beta_-i,sigma_-i)    (Gelman, 175)
-# y ~ N(XB, s^2(X^T X)^-1) = N(Yhat, s^2(X^T X)^-1)
-LPPDs <- sapply(evaData, function(eva) sum(log(dnorm(Y, eva$Yhati, eva$sigma))))
-
-# Plot Log predictive density (log-likelihood)
-barplot(-2*LPPDs, xlab = "Models", ylab = "lppd", names.arg = seq(1,length(models)))
+### Model evaluation ###
+criteria <- bayesModelEvaluation(models, Y, R = 50, b = 10) # R = 500, b = 100
 
 # Check proportion
-print(MSEs/(-2*LPPDs))
-# TODO: Explain why not fulfilled
+print(criteria$MSEs/(-2*criteria$LPPDs))
+# TODO: Als Tabelle ausgeben? Explain why not fulfilled
 
-# 3. Optimal model
-optimalIdx <- which.min(-2*LPPDs)
+# Choose optimal modal
+optIdx <- which.min(-2*criteria$LPPDs)
 
-# Check if MSE is same
-print(paste(which.min(MSEs), "=", which.min(-2*LPPDs)))
+# Check if MSE and LPPD would choose the same
+print(paste(which.min(criteria$MSEs), "=", which.min(-2*criteria$LPPDs)))
+# TODO den Vergleich einfach nur im Text verwenden?
+```
 
-# 4. Estimation
-sample <- gibbsSampler(models[[optimalIdx]], Y, B)
-estimates <- pointEstimate(sample$betas[-(1:b),], sample$sigma[-(1:b)])
+## Cook's Distance
 
-# 5. Plots
-plotSampling(sample$betas, sample$sigma)
+```{r plotTraceExample, echo = FALSE}
+plotTraces <- function(sample) {
+  ## Traces
+  
+  # Get number of available steps, but max 1000
+  numTraceSteps <- min(c(nrow(sample$betas), 1000))
+  
+  # Plot traces
+  par(mfrow = c(1,2), cex=1)
+  for(i in 1:ncol(sample$betas)) {
+    plot(sample$betas[1:numTraceSteps,i], type='l', ylab=bquote(beta[.(i-1)]),
+         main=bquote("Trace of" ~ beta[.(i-1)]))
+  }
+  plot(sample$sigma[1:numTraceSteps], type='l', ylab=bquote(sigma^2),
+       main=bquote("Trace of" ~ sigma^2))
+}
+```
 
-# 6. Predict values, using posterior mean
-Yhat <- models[[optimalIdx]]%*%estimates$betas
+```{r plotDensityExample, echo = FALSE}
+plotDensities <- function(sample, b) {
+  ## Marginal posterior densities (remove burn in)
+  
+  # Function to draw plot
+  drawHistDensity <- function(para, para_name) {
+    # para     : Parameter (e.g. Beta, Sigma)
+    # para_name: Title of plot
+    
+    # Estimate density for parameter values
+    density <- density(para, bw = "SJ")
+    
+    # Draw histogram and add estimated density line
+    hist(para, freq = FALSE, ylim = c(0,max(density$y)), xlab = para_name,
+         ylab=NULL, main = "Marginal posterior density")
+    lines(density, col="blue")
+    
+    # Posterior mean
+    abline(v = mean(para), col="red")
+  }
+  
+  # Adjust frame and plot all parameters
+  par(mfrow = c(1,2), cex=1)
+  for(i in 1:ncol(sample$betas)) {
+    drawHistDensity(sample$betas[-(1:b),i], bquote(beta[.(i-1)]))
+  }
+  drawHistDensity(sample$sigma[-(1:b)], bquote(sigma))
+}
+```
 
-# 7. Cooks distance
+```{r cooksDistanceFunction}
+cooksDistance <- function(X, Y, R, b) {
+  # R is a vector
+  B <- R + b
+  
+  # Prepare projection matrix and number of parameters
+  H <- X%*%solve(t(X)%*%X)%*%t(X)
+  p <- ncol(X)
+  steps <- length(R)
+  
+  # Run cross validation with vector R
+  cv <- crossValidation(X, Y, R, b)
+  
+  # Sample whole model (add R+b samples, remove b later)
+  sample <- gibbsSampler(X, Y, R[steps] + b)
+  
+  # Plot traces and densities
+  plotTraces(sample)
+  cat("\n\n") # Add some space to avoid floating
+  plotDensities(sample, b)
+  
+  # Cook's distance: Frequentist appraoch with analytic solution
+  betaHat <- solve(t(X)%*%X)%*%t(X)%*%Y
+  YhatLinReg <- X%*%betaHat
+  E <- Y-YhatLinReg
+  cooksLinReg <- (E^2/((1/(n-p))*sum(E^2)*p))*(diag(H)/(1-diag(H))^2)
+  
+  cooksBayesCV <- matrix(nrow = n, ncol = steps)
+  for(k in 1:steps) {
+    # Estimate posterior mean from betas
+    betas <- colMeans(sample$betas[b:B[k],])
+    
+    # Predict values, using posterior mean
+    Yhat <- X%*%betas
+    
+    # Calculate cook's distance
+    dists <- apply(cv$Betas[[k]], 2, function(betas) {
+      return((Yhat - X%*%betas)^2)
+    })
+    mse <- (1/(n-p))*sum((Y-Yhat)^2)
+    cooksBayesCV[,k] <- colSums(dists)/(p*mse)
+  }
+  
+  return(list(cooksBayesCV = cooksBayesCV, cooksLinReg = cooksLinReg))
+}
+```
 
-# Preparations
-X <- models[[optimalIdx]]
-H <- X%*%solve(t(X)%*%X)%*%t(X)
-dists <- apply(evaData[[optimalIdx]]$betas, 1, function(beta) {
-  return((Yhat - X%*%beta)^2)
-})
+```{r cookDistancePlotFunction, echo = FALSE}
+# Plot Cook's distance result
+plotCooks <- function(cooks, R) {
+  # Initialize matrices
+  steps <- length(R)
+  matBayesD <- cooks$cooksBayesCV
+  matFreqD <- matrix(rep(cooks$cooksLinReg, steps), ncol=steps)
+  
+  # Calculate differences between Cook's distance methods
+  cooksMeasure <- colSums((matBayesD-matFreqD)^2)
+  
+  # Plot differences between Cook's distance for different sample sizes
+  par(mfrow = c(1,1))
+  barplot(cooksMeasure, xlab="Sample size", ylab="Difference measure", names.arg=R,
+          main="Square distances: Cook's cross validation vs. Cook's analytic")
+  
+  # Plot Cook's distances pointwise for 3 sample sizes
+  par(mfrow = c(1,1))
+  sampleSizeToPlot <- c(1, round(length(R)/5), length(R))
+  for(i in sampleSizeToPlot) {
+    barplot(t(cbind(cooks$cooksBayesCV[,i], cooks$cooksLinReg)), beside = TRUE, names.arg = seq(1:n),
+            legend.text = c("Bayes: cross validation", "Frequentistic: analytic"),
+            args.legend = list(x = 'topleft', bty='n'), col = rainbow(2, s=0.5),
+            xlab = "Data point", ylab = "Cook's distance",
+            main=paste("Cook's distance comparison after", R[i], "simulations"))
+  }
+}
+```
 
-# Cook in Bayes
-p <- ncol(models[[optimalIdx]])
-mse <- (1/n)*sum((Y-Yhat)^2)
-cooksBayesCV <- colSums(dists)/(p*mse)
+```{r cooksDistance}
+### Cook's Distance ###
 
-# Cook in Freq
-betaHat <- solve(t(X)%*%X)%*%t(X)%*%Y
-YhatLinReg <- X%*%betaHat
-E <- Y-YhatLinReg
-cooksLinReg <- (E^2/as.numeric(((1/n)*sum(E^2)*p)))*(diag(H)/(1-diag(H))^2)
+# Number of samples
+b <- 100
+R <- seq(100,500,50) # seq(100,5000,50)
 
-# n oder n-p ??
+# Get optimal model and calculate projection matrix
+cooks <- cooksDistance(models[[optIdx]], Y, R, b)
+```
 
-# Plot both
-
-par(mfrow=c(1,1))
-barplot(t(cbind(cooksBayesCV, cooksLinReg)), beside = TRUE, names.arg = seq(1:n),
-        legend.text = c("Bayes: cross validation", "Bayes: cv2", "Frequentistic: analytic"),
-        args.legend = list(x = 'topleft', bty='n'), col = rainbow(2, s=0.5),
-        xlab = "Data point", ylab = "Cook's Distance")
-
+```{r plotCookDistances, fig.height=5}
+# Plot results from Cook's distance calculation
+plotCooks(cooks, R)
 ```
 
 <!-- References -->
