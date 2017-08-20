@@ -54,7 +54,7 @@ library(mvtnorm)
 \begin{raggedleft}
   Johannes Brinkmann (), \href{mailto:jojo-brinkmann@gmx.de}{jojo-brinkmann@gmx.de}\\
   Carlo Michaelis (5043128), \href{mailto:carlo.michaelis@gmail.com}{carlo.michaelis@gmail.com}\\
-  Max Reinhardt (), \href{mailto:maxreinhardt@me.com}{max\_reinhardt@me.com}\\
+  Max Reinhardt (579174), \href{mailto:maxreinhardt@me.com}{max\_reinhardt@me.com}\\
   Adrian Rolf (), \href{mailto:adrian.rolf@gmx.de}{adrian.rolf@gmx.de}\\
   \ \\
   Master Statistics\\
