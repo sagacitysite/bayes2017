@@ -5,7 +5,7 @@ output:
     keep_tex: true
     latex_engine: pdflatex
     number_sections: true
-    fig_height: 3
+    fig_height: 5
     fig_width: 10
 header-includes:
 - \usepackage[english]{babel}
@@ -186,7 +186,7 @@ bayesModelEvaluation <- function(models, Y, R, b) {
 
 Run model evaluation with data
 
-```{r modelEvaluation, fig.height=5}
+```{r modelEvaluation, fig.cap="Model evaluation using MSE and lppd"}
 # Swiss data
 dat <- swiss
 
@@ -227,7 +227,7 @@ print(paste(which.min(criteria$MSEs), "=", which.min(-2*criteria$LPPDs)))
 
 ## Cook's Distance
 
-```{r plotTraceExample, echo = FALSE}
+```{r plotTraceFunction, echo = FALSE}
 plotTraces <- function(sample) {
   ## Traces
   
@@ -235,7 +235,10 @@ plotTraces <- function(sample) {
   numTraceSteps <- min(c(nrow(sample$betas), 1000))
   
   # Plot traces
-  par(mfrow = c(1,2), cex=1)
+  q <- ncol(sample$betas) + 1
+  frameRows <- round(q/2+0.1)
+  par(mfrow = c(frameRows,2))
+  #par(mfrow = c(1,2), cex=1)
   for(i in 1:ncol(sample$betas)) {
     plot(sample$betas[1:numTraceSteps,i], type='l', ylab=bquote(beta[.(i-1)]),
          main=bquote("Trace of" ~ beta[.(i-1)]))
@@ -245,7 +248,7 @@ plotTraces <- function(sample) {
 }
 ```
 
-```{r plotDensityExample, echo = FALSE}
+```{r plotDensityFunction, echo = FALSE}
 plotDensities <- function(sample, b) {
   ## Marginal posterior densities (remove burn in)
   
@@ -267,7 +270,10 @@ plotDensities <- function(sample, b) {
   }
   
   # Adjust frame and plot all parameters
-  par(mfrow = c(1,2), cex=1)
+  q <- ncol(sample$betas) + 1
+  frameRows <- round(q/2+0.1)
+  par(mfrow = c(frameRows,2))
+  #par(mfrow = c(1,2), cex=1)
   for(i in 1:ncol(sample$betas)) {
     drawHistDensity(sample$betas[-(1:b),i], bquote(beta[.(i-1)]))
   }
@@ -291,11 +297,6 @@ cooksDistance <- function(X, Y, R, b) {
   # Sample whole model (add R+b samples, remove b later)
   sample <- gibbsSampler(X, Y, R[steps] + b)
   
-  # Plot traces and densities
-  plotTraces(sample)
-  cat("\n\n") # Add some space to avoid floating
-  plotDensities(sample, b)
-  
   # Cook's distance: Frequentist appraoch with analytic solution
   betaHat <- solve(t(X)%*%X)%*%t(X)%*%Y
   YhatLinReg <- X%*%betaHat
@@ -318,36 +319,7 @@ cooksDistance <- function(X, Y, R, b) {
     cooksBayesCV[,k] <- colSums(dists)/(p*mse)
   }
   
-  return(list(cooksBayesCV = cooksBayesCV, cooksLinReg = cooksLinReg))
-}
-```
-
-```{r cookDistancePlotFunction, echo = FALSE}
-# Plot Cook's distance result
-plotCooks <- function(cooks, R) {
-  # Initialize matrices
-  steps <- length(R)
-  matBayesD <- cooks$cooksBayesCV
-  matFreqD <- matrix(rep(cooks$cooksLinReg, steps), ncol=steps)
-  
-  # Calculate differences between Cook's distance methods
-  cooksMeasure <- colSums((matBayesD-matFreqD)^2)
-  
-  # Plot differences between Cook's distance for different sample sizes
-  par(mfrow = c(1,1))
-  barplot(cooksMeasure, xlab="Sample size", ylab="Difference measure", names.arg=R,
-          main="Square distances: Cook's cross validation vs. Cook's analytic")
-  
-  # Plot Cook's distances pointwise for 3 sample sizes
-  par(mfrow = c(1,1))
-  sampleSizeToPlot <- c(1, round(length(R)/5), length(R))
-  for(i in sampleSizeToPlot) {
-    barplot(t(cbind(cooks$cooksBayesCV[,i], cooks$cooksLinReg)), beside = TRUE, names.arg = seq(1:n),
-            legend.text = c("Bayes: cross validation", "Frequentistic: analytic"),
-            args.legend = list(x = 'topleft', bty='n'), col = rainbow(2, s=0.5),
-            xlab = "Data point", ylab = "Cook's distance",
-            main=paste("Cook's distance comparison after", R[i], "simulations"))
-  }
+  return(list(cooksBayesCV = cooksBayesCV, cooksLinReg = cooksLinReg, sample = sample))
 }
 ```
 
@@ -362,9 +334,54 @@ R <- seq(100,500,50) # seq(100,5000,50)
 cooks <- cooksDistance(models[[optIdx]], Y, R, b)
 ```
 
-```{r plotCookDistances, fig.height=5}
-# Plot results from Cook's distance calculation
-plotCooks(cooks, R)
+Traces from bayes regression sampling
+
+```{r plotTracesExample, echo=FALSE, fig.height=8, fig.cap="Traces"}
+# Plot traces
+plotTraces(cooks$sample)
+```
+
+Posterior densities from bayes regression sampling
+
+```{r plotDensitiesExample, echo=FALSE, fig.height=8, fig.cap="Densities"}
+# Plot traces
+plotDensities(cooks$sample, b)
+```
+
+Apply cook's distance measure
+
+```{r prepareCookDistancesPlot}
+# Initialize matrices
+steps <- length(R)
+matBayesD <- cooks$cooksBayesCV
+matFreqD <- matrix(rep(cooks$cooksLinReg, steps), ncol=steps)
+
+# Calculate differences between Cook's distance methods
+cooksMeasure <- colSums((matBayesD-matFreqD)^2)
+```
+
+Cook's distance measure
+
+```{r plotCookDistancesMeasure, echo=FALSE, fig.cap="Cook's distance measure"}
+# Plot differences between Cook's distance for different sample sizes
+par(mfrow = c(1,1))
+barplot(cooksMeasure, xlab="Sample size", ylab="Difference measure", names.arg=R,
+        main="Square distances: Cook's cross validation vs. Cook's analytic")
+```
+
+Cook's distance, comarison between bayes and frequentist
+
+```{r plotCookDistances, echo=FALSE, fig.height=10, fig.cap="Pointwise cook's distance after three different simulation sizes, compared to analytic cook's distance from frequentist linear regression model using least squares."}
+# Plot Cook's distances pointwise for 3 sample sizes
+par(mfrow = c(3,1))
+sampleSizeToPlot <- c(1, round(length(R)/5), length(R))
+for(i in sampleSizeToPlot) {
+  barplot(t(cbind(cooks$cooksBayesCV[,i], cooks$cooksLinReg)), beside = TRUE, names.arg = seq(1:n),
+          legend.text = c("Bayes: cross validation", "Frequentistic: analytic"),
+          args.legend = list(x = 'topleft', bty='n'), col = rainbow(2, s=0.5),
+          xlab = "Data point", ylab = "Cook's distance",
+          main=paste("Cook's distance comparison after", R[i], "simulations"))
+}
 ```
 
 <!-- References -->
