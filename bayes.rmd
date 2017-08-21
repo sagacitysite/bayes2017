@@ -1,4 +1,5 @@
 ---
+graphics: yes
 output: 
   pdf_document:
     fig_caption: true
@@ -85,11 +86,25 @@ The Gibbs sampler
 
 ```{r gibbsSampler}
 gibbsSampler <- function(X, Y, R, b = 0, initSigma = 1) {
+  # Sample parameters from posterior distribution
+  # Prepared for baysean linear regression with ordinary least square approach (OLS)
+  #
+  # Args:
+  #   X: Design matrix
+  #   Y: Labels
+  #   R: Number of draws (without burn in), R is a scalar in this funcrion
+  #   b: Number of burn in draws
+  #   initSigma: Initial value of sigma (default 1)
+  #
+  # Returns:
+  #   List containing sampled betas (number depends on design matrix) and sigmas
+  
+  # Get number of overall draws (including burn in)
   B <- R + b
   
   # Size of design matrix
-  n <- nrow(X)
-  p <- ncol(X)
+  n <- nrow(X) # Number of data points
+  p <- ncol(X) # Number of parameters
   
   # Variables to store the samples in (initalize sigma with initSigma)
   betas <- matrix(nrow = B, ncol = p)
@@ -113,7 +128,7 @@ gibbsSampler <- function(X, Y, R, b = 0, initSigma = 1) {
     }
   }
   
-  # Remove burn in
+  # Remove burn in, if there is some
   if(b != 0) {
     betas <- betas[-(1:b),]
     sigma <- sigma[-(1:b)]
@@ -127,20 +142,34 @@ Cross Validation function
 
 ```{r crossValidation}
 crossValidation <- function(X, Y, R, b) {
+  # Implementation of leave-one-out cross validation (LOO-CV)
+  # Cross validate bayesian linear regression model with OLS
+  #
+  # Args:
+  #   X: Design matrix
+  #   Y: Labels
+  #   R: Number of draws (without burn in), R can be a vector in this function
+  #   b: Number of burn in draws
+  #
+  # Returns:
+  #   List containing estimated parameters and label predictions for every LOO-CV step
+  
   # Size of design matrix
-  n <- nrow(X)
-  p <- ncol(X)
+  n <- nrow(X) # Number of data points 
+  p <- ncol(X) # Number of parameters
+  
+  # Get size of R vector (steps = 1, if R is scalar)
   steps <- length(R)
   
   # Run gibbs sampler to get sampled parameters
   samples <- lapply(1:n, function(i) gibbsSampler(X[-i,], Y[-i], R[steps], b))
   
-  # Initalize lists
+  # Initalize lists to store results of estimation and prediction
   Sigma <- list()
   Betas <- list()
   Yhati <- list()
   
-  # Calculate sigma, betas and Yhati for every step
+  # Calculate sigma, betas and Yhati for every R step (do it once if R is scalar)
   for(k in 1:steps) {
     Sigma[[k]] <- sapply(samples, function(sample) mean(sample$sigma[1:R[k]]))
     Betas[[k]] <- sapply(samples, function(sample) colMeans(sample$betas[1:R[k],]))
@@ -155,6 +184,18 @@ crossValidation <- function(X, Y, R, b) {
 
 ```{r modelEvaluationFunction}
 bayesModelEvaluation <- function(models, Y, R, b) {
+  # Model evaluation based on mean squared error (MSE) and log posterior
+  # predictive density (lppd) using leave-one-out cross validation (LOO-CV)
+  #
+  # Args:
+  #   models: A list of design matrices with different size and types of parameters
+  #   Y: Labels
+  #   R: Number of draws (without burn in), R can be a vector in this function
+  #   b: Number of burn in draws
+  #
+  # Returns:
+  #   List containing MSEs and LPPDs for every model
+  
   # Evaluate multiple models and return results from all models
   n <- length(Y)
   k <- length(models)
@@ -167,18 +208,9 @@ bayesModelEvaluation <- function(models, Y, R, b) {
     return((1/(n-nrow(el$Betas[[1]])))*sum((Y-el$Yhati[[1]])^2))
   })
   
-  # Plot MSEs
-  par(mfrow = c(1,2))
-  barplot(MSEs, xlab = "Models", ylab = "MSE", names.arg = seq(1,k),
-          main = "Model evaluation using MSE")
-  
   # Calculate log posterior predictive density (log likelihood)
   # y ~ N(XB, s^2(X^T X)^-1) = N(Yhat, s^2(X^T X)^-1)
   LPPDs <- sapply(results, function(eva) sum(log(dnorm(Y, eva$Yhati[[1]], eva$Sigma[[1]]))))
-  
-  # Plot LPPDs
-  barplot(-2*LPPDs, xlab = "Models", ylab = "lppd", names.arg = seq(1,k),
-          main = "Model evaluation using lppd")
   
   return(list(MSEs = MSEs, LPPDs = LPPDs))
 }
@@ -186,7 +218,7 @@ bayesModelEvaluation <- function(models, Y, R, b) {
 
 Run model evaluation with data
 
-```{r modelEvaluation, fig.cap="Model evaluation using MSE and lppd"}
+```{r modelEvaluation}
 # Swiss data
 dat <- swiss
 
@@ -210,9 +242,22 @@ models <- list(
   matrix(c(rep(1,n), dat$Education, dat$Agriculture, dat$Examination ,dat$Catholic), nrow=n)
 )
 
-### Model evaluation ###
+# Run model evaluation
 criteria <- bayesModelEvaluation(models, Y, R = 50, b = 10) # R = 500, b = 100
+```
 
+```{r plotModelEvaluationResults, echo=FALSE, fig.cap="Model evaluation with leave-one-out cross validation (LOO-CV) using mean squared errors (MSE) and log posterior predictive density (lppd) to obtain best model.", fig.scap="Model evaluation with MSE and lppd", fig.align="center"}
+par(mfrow = c(1,2))
+# Plot MSEs
+barplot(criteria$MSEs, xlab = "Models", ylab = "MSE", names.arg = seq(1,length(models)),
+        main = "Model evaluation using MSE")
+
+# Plot LPPDs
+barplot(-2*criteria$LPPDs, xlab = "Models", ylab = "lppd", names.arg = seq(1,length(models)),
+        main = "Model evaluation using lppd")
+```
+
+```{r evaluateModelEvaluationResults}
 # Check proportion
 print(criteria$MSEs/(-2*criteria$LPPDs))
 # TODO: Als Tabelle ausgeben? Explain why not fulfilled
@@ -229,16 +274,24 @@ print(paste(which.min(criteria$MSEs), "=", which.min(-2*criteria$LPPDs)))
 
 ```{r plotTraceFunction, echo = FALSE}
 plotTraces <- function(sample) {
-  ## Traces
+  # Uses a sample from Gibbs sampler to plot traces of drawn parameters
+  # -> Burn in samples are shown
+  #
+  # Args:
+  #   sample: A sample from Gibbs sampler
+  #
+  # Returns:
+  #   -
   
   # Get number of available steps, but max 1000
   numTraceSteps <- min(c(nrow(sample$betas), 1000))
   
-  # Plot traces
+  # Prepare plot frame
   q <- ncol(sample$betas) + 1
   frameRows <- round(q/2+0.1)
   par(mfrow = c(frameRows,2))
-  #par(mfrow = c(1,2), cex=1)
+  
+  # Plot traces
   for(i in 1:ncol(sample$betas)) {
     plot(sample$betas[1:numTraceSteps,i], type='l', ylab=bquote(beta[.(i-1)]),
          main=bquote("Trace of" ~ beta[.(i-1)]))
@@ -250,59 +303,96 @@ plotTraces <- function(sample) {
 
 ```{r plotDensityFunction, echo = FALSE}
 plotDensities <- function(sample, b) {
-  ## Marginal posterior densities (remove burn in)
+  # Uses a sample from Gibbs sampler to plot marginal posterior densities
+  # of drawn parameters, where densities are estimated using a kernel estimation
+  # -> Burn in samples are removed
+  #
+  # Args:
+  #   sample: A sample from Gibbs sampler
+  #   b: Number of burn in draws
+  #
+  # Returns:
+  #   -
   
   # Function to draw plot
-  drawHistDensity <- function(para, para_name) {
-    # para     : Parameter (e.g. Beta, Sigma)
-    # para_name: Title of plot
+  drawHistDensity <- function(para, para_name, para_main) {
+    # Local helper function to plot histogram with density esimtation and posterior mean
+    #
+    # Args:
+    #   para     : Parameter (e.g. Beta, Sigma)
+    #   para_name: Name of parameter
+    #   para_main: Main title of plot
+    #
+    # Returns:
+    #   -
     
     # Estimate density for parameter values
     density <- density(para, bw = "SJ")
     
     # Draw histogram and add estimated density line
-    hist(para, freq = FALSE, ylim = c(0,max(density$y)), xlab = para_name,
-         ylab=NULL, main = "Marginal posterior density")
+    hist(para, freq = FALSE, ylim = c(0,max(density$y)),
+         xlab = para_name, ylab=NULL, main = para_main)
     lines(density, col="blue")
     
     # Posterior mean
     abline(v = mean(para), col="red")
   }
   
-  # Adjust frame and plot all parameters
+  # Prepare plot frame
   q <- ncol(sample$betas) + 1
   frameRows <- round(q/2+0.1)
   par(mfrow = c(frameRows,2))
-  #par(mfrow = c(1,2), cex=1)
+  
+  # Plot histogram, densities and posterior mean (remove burn in samples)
   for(i in 1:ncol(sample$betas)) {
-    drawHistDensity(sample$betas[-(1:b),i], bquote(beta[.(i-1)]))
+    drawHistDensity(sample$betas[-(1:b),i], bquote(beta[.(i-1)]),
+                    bquote("Marginal posterior density of" ~ beta[.(i-1)]))
   }
-  drawHistDensity(sample$sigma[-(1:b)], bquote(sigma))
+  drawHistDensity(sample$sigma[-(1:b)], bquote(sigma),
+                  bquote("Marginal posterior density of" ~ sigma))
 }
 ```
 
 ```{r cooksDistanceFunction}
 cooksDistance <- function(X, Y, R, b) {
-  # R is a vector
+  # Calculate cooks distances for optimal model from model evaluaion
+  # Two methods are used:
+  #   (1) Use LOO-CV approach for bayesian linear regression model with OLS
+  #   (2) Use analytic solution for frequentist linear regression model with OLS
+  #
+  # Args:
+  #   X: Design matrix
+  #   Y: Labels
+  #   R: Number of draws (without burn in), R can be a vector in this function
+  #   b: Number of burn in draws
+  #
+  # Returns:
+  #   cooksBayesCV:   Cook's distances calculated by LOO-CV (bayes model),
+  #                   where cook's distances are calculated for different sample sizes
+  #   cooksAnalytic:  Cook's distances calculated by analytic solution
+  #   sample:         The gibbs sample from the bayes linear model (for plotting purpose)
+  
+  # R is usually a vector (but don't has to)
   B <- R + b
+  steps <- length(R)
   
   # Prepare projection matrix and number of parameters
   H <- X%*%solve(t(X)%*%X)%*%t(X)
   p <- ncol(X)
-  steps <- length(R)
   
   # Run cross validation with vector R
   cv <- crossValidation(X, Y, R, b)
   
-  # Sample whole model (add R+b samples, remove b later)
+  # Sample whole model (add B = R + b samples, remove b later)
   sample <- gibbsSampler(X, Y, R[steps] + b)
   
   # Cook's distance: Frequentist appraoch with analytic solution
   betaHat <- solve(t(X)%*%X)%*%t(X)%*%Y
   YhatLinReg <- X%*%betaHat
   E <- Y-YhatLinReg
-  cooksLinReg <- (E^2/((1/(n-p))*sum(E^2)*p))*(diag(H)/(1-diag(H))^2)
+  cooksAnalytic <- (E^2/((1/(n-p))*sum(E^2)*p))*(diag(H)/(1-diag(H))^2)
   
+  # Cook's distance: Bayesian appraoch with LOO-VC solution
   cooksBayesCV <- matrix(nrow = n, ncol = steps)
   for(k in 1:steps) {
     # Estimate posterior mean from betas
@@ -319,13 +409,13 @@ cooksDistance <- function(X, Y, R, b) {
     cooksBayesCV[,k] <- colSums(dists)/(p*mse)
   }
   
-  return(list(cooksBayesCV = cooksBayesCV, cooksLinReg = cooksLinReg, sample = sample))
+  return(list(cooksBayesCV = cooksBayesCV, cooksAnalytic = cooksAnalytic, sample = sample))
 }
 ```
 
-```{r cooksDistance}
-### Cook's Distance ###
+Calculate cook's distances
 
+```{r cooksDistance}
 # Number of samples
 b <- 100
 R <- seq(100,500,50) # seq(100,5000,50)
@@ -336,14 +426,14 @@ cooks <- cooksDistance(models[[optIdx]], Y, R, b)
 
 Traces from bayes regression sampling
 
-```{r plotTracesExample, echo=FALSE, fig.height=8, fig.cap="Traces"}
+```{r plotTracesExample, echo=FALSE, fig.height=8, fig.cap="Traces of sampled parameters from posterior distributions regarding bayesian linear regression with ordinary least squares.", fig.scap="Traces of sampled parameters from posterior distributions", fig.align="center"}
 # Plot traces
 plotTraces(cooks$sample)
 ```
 
 Posterior densities from bayes regression sampling
 
-```{r plotDensitiesExample, echo=FALSE, fig.height=8, fig.cap="Densities"}
+```{r plotDensitiesExample, echo=FALSE, fig.height=8, fig.cap="Posterior densities, histograms and posterior means (red vertical line) of sampled parameters regarding bayesian linear regression with ordinary least squares", fig.scap="Posterior densities of sampled parameters", fig.align="center"}
 # Plot traces
 plotDensities(cooks$sample, b)
 ```
@@ -354,7 +444,7 @@ Apply cook's distance measure
 # Initialize matrices
 steps <- length(R)
 matBayesD <- cooks$cooksBayesCV
-matFreqD <- matrix(rep(cooks$cooksLinReg, steps), ncol=steps)
+matFreqD <- matrix(rep(cooks$cooksAnalytic, steps), ncol=steps)
 
 # Calculate differences between Cook's distance methods
 cooksMeasure <- colSums((matBayesD-matFreqD)^2)
@@ -362,7 +452,7 @@ cooksMeasure <- colSums((matBayesD-matFreqD)^2)
 
 Cook's distance measure
 
-```{r plotCookDistancesMeasure, echo=FALSE, fig.cap="Cook's distance measure"}
+```{r plotCookDistancesMeasure, echo=FALSE, fig.cap="Cook's distance measure to quantify approximation from cross validated cook's distances of analytic cook's distances. The approximate solution with LOO-CV comes closer to the analytic solution, the more samples are drawn.", fig.scap="Cook's distance measure for approximation of analytic solution by LOO-CV solution", fig.align="center"}
 # Plot differences between Cook's distance for different sample sizes
 par(mfrow = c(1,1))
 barplot(cooksMeasure, xlab="Sample size", ylab="Difference measure", names.arg=R,
@@ -371,12 +461,12 @@ barplot(cooksMeasure, xlab="Sample size", ylab="Difference measure", names.arg=R
 
 Cook's distance, comarison between bayes and frequentist
 
-```{r plotCookDistances, echo=FALSE, fig.height=10, fig.cap="Pointwise cook's distance after three different simulation sizes, compared to analytic cook's distance from frequentist linear regression model using least squares."}
+```{r plotCookDistances, echo=FALSE, fig.height=10, fig.cap="Pointwise cook's distance, calculated with three different sample sizes, compared to analytic cook's distance from frequentist linear regression model using least squares.", fig.scap="Pointwise cook's distance comparison between COO-LV and analytic solution", fig.align="center"}
 # Plot Cook's distances pointwise for 3 sample sizes
 par(mfrow = c(3,1))
 sampleSizeToPlot <- c(1, round(length(R)/5), length(R))
 for(i in sampleSizeToPlot) {
-  barplot(t(cbind(cooks$cooksBayesCV[,i], cooks$cooksLinReg)), beside = TRUE, names.arg = seq(1:n),
+  barplot(t(cbind(cooks$cooksBayesCV[,i], cooks$cooksAnalytic)), beside = TRUE, names.arg = seq(1:n),
           legend.text = c("Bayes: cross validation", "Frequentistic: analytic"),
           args.legend = list(x = 'topleft', bty='n'), col = rainbow(2, s=0.5),
           xlab = "Data point", ylab = "Cook's distance",
@@ -386,3 +476,4 @@ for(i in sampleSizeToPlot) {
 
 <!-- References -->
 # References
+
