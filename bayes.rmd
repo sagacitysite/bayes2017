@@ -78,6 +78,31 @@ library(mvtnorm)
 <!-- Document Body -->
 # Introduction
 
+## Leave-one-out cross-validation
+
+\textit{Leave-one-out cross-validation}, or short \textit{loo-cv} is a method for checking the predictive out-of-sample accuracy of a model. The idea is to omit the $i$-th observation and to fit the model for the remaining observations and then to predict the $y_i$  as an out of sample point. This prediction is denoted as $\hat{y}_i^{(i)}$. Thus, we can overcome -- at least to some extent -- the problem of overfitting. The loo-cv method can be used in several ways for model evaluation and selection. We will use it in two ways. First, we will use it to calculate the \textit{log pointwise prediction density} using the loo-cv, which is defined as
+\begin{equation}
+	\text{lppd}_{\text{loo-cv}} = \sum\limits_{i=1}^{n} \log p_{\text{dens}(-i)}(y_i).
+\end{equation}
+That is, we calculate the densities of all $y_i$ using the parameters we obtain from the $n$ bayesian models, applying the loo-cv method. Then taking the logarithm and summing up. In the case at hand we deal with the normal density, since $y_i \sim \mathcal{N}\left(X_{(-i)}\beta_{(-i)}, \sigma^2_{(-i)}\right)$. Furthermore, multiplying with $-2$, i.e. $-2\ \text{lppd}_{\text{loo-cv}}$, gives us a measure that is comparable with other measures of predictive accuracy (e.g. AIC or WAIC) (Gelman, 2013). Besides the MSE we will use $-2\ \text{lppd}_{\text{loo-cv}}$ for model selection within the Bayesian framework.
+
+Second, we will need it in the context of comparing the predictive out-of-sample accuracy of the Bayesian and the frequentist model using Cook's distance.
+
+
+## Cooks's Distance
+
+\textit{Cooks's Distance}, or short \textit{Cook's D}, is a measure to detect influential points in a linear regression. It was invented by Cook (1977) and is defined as
+\begin{equation}
+	D_i = \frac{\sum_{j=1}^{n}\left(\hat{y}_j - \hat{y}_j^{(i)}\right)^2}{p\ \text{MSE}} \stackrel{\text{(OLS)}}=
+	\frac{e_i^2}{p\ \text{MSE}}\left(\frac{h_{ii}}{(1-h_{ii})^2}\right),
+\end{equation}
+where $\text{MSE}=\frac{1}{n-p}\sum_{i=1}^{n}(y_i-\hat{y})^2$ is the \textit{mean squared error}, 
+$e_i^2 = (y_i-\hat{y})^2$ is the error for each observation $i$ and 
+$h_{ii} = x_i(X^TX)^{-1}x_i^T$ is the $i$-th diagonal element of the projection matrix of an OLS regression model, also called the \textit{leverage} of an observation, which indicates the influence of an single observation on the model fit. 
+
+As above, the $\hat{y}^{(i)}$ is the predicted value for $y_i$ if we exclude the $i$-th observation and fit the model for the remaining observations. 
+Note that the right hand side term of the model is an analytical expression. In this case there is no need to fit additional $n$ models to get the $\hat{y}^{(i)}$ predictions. This yields to a great advantage in performance, especially for large numbers of observations. But the analytical expression is constraint to OLS models -- indicated by the \textit{OLS} over the equation sign -- since the projection matrix is used. For this reason we will use the left hand expression to calculate Cook's D in the Bayesian case using the loo-cv method described above and the right hand expression for the frequentist OLS regression model.
+
 # Code
 
 ## General code
