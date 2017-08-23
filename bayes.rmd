@@ -78,12 +78,16 @@ library(mvtnorm)
 <!-- Document Body -->
 # Introduction
 
+# Theory
+
 ## Leave-one-out cross-validation
 
 \textit{Leave-one-out cross-validation}, or short \textit{loo-cv} is a method for checking the predictive out-of-sample accuracy of a model. The idea is to omit the $i$-th observation and to fit the model for the remaining observations and then to predict the $y_i$  as an out of sample point. This prediction is denoted as $\hat{y}_i^{(i)}$. Thus, we can overcome -- at least to some extent -- the problem of overfitting. The loo-cv method can be used in several ways for model evaluation and selection. We will use it in two ways. First, we will use it to calculate the \textit{log pointwise prediction density} using the loo-cv, which is defined as
+
 \begin{equation}
 	\text{lppd}_{\text{loo-cv}} = \sum\limits_{i=1}^{n} \log p_{\text{dens}(-i)}(y_i).
 \end{equation}
+
 That is, we calculate the densities of all $y_i$ using the parameters we obtain from the $n$ bayesian models, applying the loo-cv method. Then taking the logarithm and summing up. In the case at hand we deal with the normal density, since $y_i \sim \mathcal{N}\left(X_{(-i)}\beta_{(-i)}, \sigma^2_{(-i)}\right)$. Furthermore, multiplying with $-2$, i.e. $-2\ \text{lppd}_{\text{loo-cv}}$, gives us a measure that is comparable with other measures of predictive accuracy (e.g. AIC or WAIC) (Gelman, 2013). Besides the MSE we will use $-2\ \text{lppd}_{\text{loo-cv}}$ for model selection within the Bayesian framework.
 
 Second, we will need it in the context of comparing the predictive out-of-sample accuracy of the Bayesian and the frequentist model using Cook's distance.
@@ -92,10 +96,13 @@ Second, we will need it in the context of comparing the predictive out-of-sample
 ## Cooks's Distance
 
 \textit{Cooks's Distance}, or short \textit{Cook's D}, is a measure to detect influential points in a linear regression. It was invented by Cook (1977) and is defined as
+
 \begin{equation}
+\label{eq:cookd}
 	D_i = \frac{\sum_{j=1}^{n}\left(\hat{y}_j - \hat{y}_j^{(i)}\right)^2}{p\ \text{MSE}} \stackrel{\text{(OLS)}}=
 	\frac{e_i^2}{p\ \text{MSE}}\left(\frac{h_{ii}}{(1-h_{ii})^2}\right),
 \end{equation}
+
 where $\text{MSE}=\frac{1}{n-p}\sum_{i=1}^{n}(y_i-\hat{y})^2$ is the \textit{mean squared error}, 
 $e_i^2 = (y_i-\hat{y})^2$ is the error for each observation $i$ and 
 $h_{ii} = x_i(X^TX)^{-1}x_i^T$ is the $i$-th diagonal element of the projection matrix of an OLS regression model, also called the \textit{leverage} of an observation, which indicates the influence of an single observation on the model fit. 
@@ -105,9 +112,14 @@ Note that the right hand side term of the model is an analytical expression. In 
 
 # Code
 
-## General code
+For both applications of the cross validation, the model evaluation and the calculation of Cook's distance, we need the Gibbs sampler and the leave-one-out cross validation (loo-cv) algorithm. Those two functions are explained in the first part. The second part is about the model evaluation and the third part compares the loo-cv Cook's distance with the analytic solution, which are defined in equation \eqref{eq:cookd}.
 
-The Gibbs sampler
+Note that we only displayed the relevant code chunks in the `pdf` file. Some chunks regarding the plotting are hidden and can be found in the `rmd` file.
+
+## Basics
+
+The first function we define ist the *Gibbs sampler*. The Gibbs sampler draw the parameters $\beta_0, ..., \beta_p, \sigma^2$ from their posterior distributions. Those distributions (see equation \eqref{??} and \eqref{??}) need the design matrix `X` and labels `Y`, which are given as arguments. Furthermore the Gibbs sampler is not just drawing one time, it draws $B$ times, where $B = R + b$. $b$ is the number of burn in samples and $R$ the number of used samples. If $b = 0$, we use all generated samples.
+
 
 ```{r gibbsSampler}
 gibbsSampler <- function(X, Y, R, b = 0, initSigma = 1) {
@@ -163,7 +175,9 @@ gibbsSampler <- function(X, Y, R, b = 0, initSigma = 1) {
 }
 ```
 
-Cross Validation function
+As next, we define a function doing the leave-one-out cross validation. It delets one data point and samples the parameters from the posterior distribution (using the `gibbsSampler` function). It is done $n$ times, where $n$ is the size (number of rows) of the data matrix, so there is a sampled posterior distribution for $n$ combinations of the data. Additionally the function estimates the posterior mean (point estimation) of the parameters and predict the labels, using the data matrix $X$ and the point esimtators of the parameters.
+
+Note that the argument $R$ can be a scalar or a vector. If $R$ is a scalar, the cross validation just runs usual. If $R$ is a ordered vector the Gibbs sampler draws as often as the last value of the $R$ vector. The size of the vector is indicated by variable `steps`. Afterwards the calculation of the posterior mean and the prediction is done for every step in the vector $R$. In the first step, just the first $R_1$ number of samples are used to estimate the parameters. In the second step, $R_2 > R_1$ number of samples are used, and so on.
 
 ```{r crossValidation}
 crossValidation <- function(X, Y, R, b) {
@@ -173,7 +187,7 @@ crossValidation <- function(X, Y, R, b) {
   # Args:
   #   X: Design matrix
   #   Y: Labels
-  #   R: Number of draws (without burn in), R can be a vector in this function
+  #   R: Number of draws (without burn in), R can be a vector (ordered) in this function
   #   b: Number of burn in draws
   #
   # Returns:
