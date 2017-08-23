@@ -32,7 +32,7 @@ knitr::opts_chunk$set(echo = TRUE)
 #library(MASS)
 #library(mixtools)
 #library(plyr)
-#library(xtable)
+library(xtable)
 library(mvtnorm)
 ```
 
@@ -85,6 +85,7 @@ library(mvtnorm)
 \textit{Leave-one-out cross-validation}, or short \textit{loo-cv} is a method for checking the predictive out-of-sample accuracy of a model. The idea is to omit the $i$-th observation and to fit the model for the remaining observations and then to predict the $y_i$  as an out of sample point. This prediction is denoted as $\hat{y}_i^{(i)}$. Thus, we can overcome -- at least to some extent -- the problem of overfitting. The loo-cv method can be used in several ways for model evaluation and selection. We will use it in two ways. First, we will use it to calculate the \textit{log pointwise prediction density} using the loo-cv, which is defined as
 
 \begin{equation}
+\label{eq:lppd}
 	\text{lppd}_{\text{loo-cv}} = \sum\limits_{i=1}^{n} \log p_{\text{dens}(-i)}(y_i).
 \end{equation}
 
@@ -103,8 +104,14 @@ Second, we will need it in the context of comparing the predictive out-of-sample
 	\frac{e_i^2}{p\ \text{MSE}}\left(\frac{h_{ii}}{(1-h_{ii})^2}\right),
 \end{equation}
 
-where $\text{MSE}=\frac{1}{n-p}\sum_{i=1}^{n}(y_i-\hat{y})^2$ is the \textit{mean squared error}, 
-$e_i^2 = (y_i-\hat{y})^2$ is the error for each observation $i$ and 
+where
+
+\begin{equation}
+\label{eq:mse}
+  \text{MSE}=\frac{1}{n-p}\sum_{i=1}^{n}(y_i-\hat{y})^2
+\end{equation}
+
+is the \textit{mean squared error}, $e_i^2 = (y_i-\hat{y})^2$ is the error for each observation $i$ and 
 $h_{ii} = x_i(X^TX)^{-1}x_i^T$ is the $i$-th diagonal element of the projection matrix of an OLS regression model, also called the \textit{leverage} of an observation, which indicates the influence of an single observation on the model fit. 
 
 As above, the $\hat{y}^{(i)}$ is the predicted value for $y_i$ if we exclude the $i$-th observation and fit the model for the remaining observations. 
@@ -221,6 +228,10 @@ crossValidation <- function(X, Y, R, b) {
 
 ## Model evaluaion
 
+The cross validation algorithm can be used to evaluate a *best* mode, where best means, that the mean squared error (mse), defined in equation \eqref{eq:mse} or the *lppd*, defined in equation \eqref{eq:lppd}, is the lowest, compared to the other models. Both measures are obtained by loo-cv.
+
+The `bayesModelEvaluation` function calls the cross validation function for every model. Then for every model the *mse* and *lppd* is calculated and returned.
+
 ```{r modelEvaluationFunction}
 bayesModelEvaluation <- function(models, Y, R, b) {
   # Model evaluation based on mean squared error (MSE) and log posterior
@@ -255,7 +266,7 @@ bayesModelEvaluation <- function(models, Y, R, b) {
 }
 ```
 
-Run model evaluation with data
+To run the mode, we first chose `swiss` as a data set. We defined a list of 11 design matrices, containing different models. Afterwards the `bayesModelEvaluation` is called to run the cross validation and the calculation of *mse* and *lppd* for every model.
 
 ```{r modelEvaluation}
 # Swiss data
@@ -266,7 +277,6 @@ Y <- dat$Fertility
 n <- nrow(dat)
 
 # Design matrices
-
 models <- list(
   matrix(c(rep(1,n), dat$Education), nrow=n),
   matrix(c(rep(1,n), dat$Agriculture), nrow=n),
@@ -285,7 +295,7 @@ models <- list(
 criteria <- bayesModelEvaluation(models, Y, R = 50, b = 10) # R = 500, b = 100
 ```
 
-```{r plotModelEvaluationResults, echo=FALSE, fig.cap="Model evaluation with leave-one-out cross validation (LOO-CV) using mean squared errors (MSE) and log posterior predictive density (lppd) to obtain best model.", fig.scap="Model evaluation with MSE and lppd", fig.align="center"}
+```{r plotModelEvaluationResults, echo=FALSE, fig.cap="\\label{fig:evalu}Model evaluation with leave-one-out cross validation (LOO-CV) using mean squared errors (MSE) and log posterior predictive density (lppd) to obtain best model.", fig.scap="Model evaluation with MSE and lppd", fig.align="center"}
 par(mfrow = c(1,2))
 # Plot MSEs
 barplot(criteria$MSEs, xlab = "Models", ylab = "MSE", names.arg = seq(1,length(models)),
@@ -296,17 +306,29 @@ barplot(-2*criteria$LPPDs, xlab = "Models", ylab = "lppd", names.arg = seq(1,len
         main = "Model evaluation using lppd")
 ```
 
-```{r evaluateModelEvaluationResults}
-# Check proportion
-print(criteria$MSEs/(-2*criteria$LPPDs))
-# TODO: Als Tabelle ausgeben? Explain why not fulfilled
+The results in figure \ref{fig:evalu} show that model $9$ seems to be the best model with lowest *mse* and lowest *lppd*, compared to the other 10 models. To check this quantitatively we get the minimum of the *mse* values and the minimum of the *lppd* values.
 
+```{r}
+print(which.min(criteria$MSEs))
+print(which.min(-2*criteria$LPPDs))
+```
+
+Indeed, both indicators favor model $9$. We need to know, that, according to Gelman (2013), *mse* is just appropriate if the model is more or less normally distributed. Furthermore if the models are normal and have constant variances, *mse* and *lppd* should have the same proportion.
+
+The proportions are calculated in table 1. It can be seen, that the proportion is in the same scale in all cases, but there are deviations. For exmaple in model $2$ and $9$ the proportions are very different. This is probably due to the fact, that all the models are not well normal distributed.
+
+```{r evaluateModelEvaluationTable, results="asis", echo=FALSE}
+# Check proportion
+prop <- matrix(criteria$MSEs/(-2*criteria$LPPDs), ncol = length(models),
+               dimnames = list("proportion", seq(1,length(models))))
+print(xtable(prop, caption = "Proportion of mse and lppd."), comment = FALSE)
+```
+
+Finally we store the index of the optimal model in a variable. In the next step we want to calculate Cook's distance just for the best mode.
+
+```{r chooseOptimal}
 # Choose optimal modal
 optIdx <- which.min(-2*criteria$LPPDs)
-
-# Check if MSE and LPPD would choose the same
-print(paste(which.min(criteria$MSEs), "=", which.min(-2*criteria$LPPDs)))
-# TODO den Vergleich einfach nur im Text verwenden?
 ```
 
 ## Cook's Distance
