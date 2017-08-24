@@ -77,7 +77,9 @@ library(mvtnorm)
 
 <!-- Document Body -->
 # Introduction
-
+Leave-on-out cross validation is one of many methods which is used after fitting a bayesian model to measure its predictive accuracy and also to chose the best model [1]. In practice it was not often used in the past due to the fact that it involves additional computation power and time as different models must be fitted in order to find the best model. 
+But there was a change in the last 10 to 15 years as computational power got cheaper and was therefore more available for the public. [2]
+In the following paper model evaluation is done by calculating the mean squared error of the model as well as the log posterior predictive density. The best model is then selected by looking for the smallest values of those calculated parameters. In the second part of the model evaluation Cook’s distance is calculated by using two different methods for a comparison. For method one we use the leave-on-out cross validation bayesian approach and compare it with method two the analytic solution for a frequentist approach.
 # Theory
 
 ## Leave-one-out cross-validation
