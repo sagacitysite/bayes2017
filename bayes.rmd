@@ -511,7 +511,7 @@ plotTraces(cooks$sample)
 plotDensities(cooks$sample, b)
 ```
 
-In the first step, we want to have a look at Cook's distances. In figure \ref{fig:cookd} the blue bars in all 3 plots are always the same analytic solution. They are compared to the the loo-cv solution using Bayes approach, which is shown in red. In the first plot `r R[1]` simulations where done, in the second plot `r R[round(length(R)/5)]` and `r R[length(R)]` in the last plot. We can see, that the loo-cv solutions is coming closer to the analytic solution, the more simulations are done.
+In the first step, we want to have a look at Cook's distances. In figure \ref{fig:cookd} the blue bars in all 3 plots are always the same analytic solution. They are compared to the the loo-cv solution using Bayes approach, which is shown in red. In the first plot `r R[1]` simulations were conducted, in the second plot `r R[round(length(R)/5)]` and `r R[length(R)]` in the last plot. We can observe, that the more simulation are done the loo-cv solution is coming closer to the analytic solution.
 
 ```{r plotCookDistances, echo=FALSE, fig.height=10, fig.cap="\\label{fig:cookd}Pointwise cook's distance, calculated with three different sample sizes, compared to analytic cook's distance from frequentist linear regression model using least squares.", fig.scap="Pointwise cook's distance comparison between COO-LV and analytic solution", fig.align="center"}
 # Plot Cook's distances pointwise for 3 sample sizes
@@ -526,7 +526,7 @@ for(i in sampleSizeToPlot) {
 }
 ```
 
-To see the convergence behavior of the loo-cv solution to the analytic solution, we developed a measure $d$ to calculate the distance between both solutions. The Cook's distance value for both solutions where subtracted, squared and summed (squared distance) as follows
+To see the convergence behavior of the loo-cv solution to the analytic solution, we developed a measure $d$ caluclating the distance between both solutions. The Cook's distance value for both solutions were subtracted, squared and summed (squared distance) as follows
 
 \begin{equation}
 d = \sum_{i=1}^n (D^\text{loo-cv}_i - D^\text{analytic}_i)^2,
