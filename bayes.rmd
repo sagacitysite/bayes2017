@@ -82,16 +82,16 @@ library(mvtnorm)
 
 ## Leave-one-out cross-validation
 
-\textit{Leave-one-out cross-validation}, or short \textit{loo-cv} is a method for checking the predictive out-of-sample accuracy of a model. The idea is to omit the $i$-th observation and to fit the model for the remaining observations and then to predict the $y_i$  as an out of sample point. This prediction is denoted as $\hat{y}_i^{(i)}$. Thus, we can overcome -- at least to some extent -- the problem of overfitting. The loo-cv method can be used in several ways for model evaluation and selection. We will use it in two ways. First, we will use it to calculate the \textit{log pointwise prediction density} using the loo-cv, which is defined as
+\textit{Leave-one-out cross-validation}, or short \textit{loo-cv} is a method for checking the predictive out-of-sample accuracy of a model. The idea is to omit the $i$-th observation and to fit the model for the remaining observations and then to predict the $y_i$  as an out of sample point. This prediction is denoted as $\hat{y}_i^{(i)}$. Thus, we can overcome -- at least to some extent -- the problem of overfitting. The loo-cv method can be used in several ways for model evaluation and selection. We will use it in two ways. First, we will use it to calculate the \textit{log pointwise prediction density} using the loo-cv, which is defined as:
 
 \begin{equation}
 \label{eq:lppd}
 	\text{lppd}_{\text{loo-cv}} = \sum\limits_{i=1}^{n} \log p_{\text{dens}(-i)}(y_i).
 \end{equation}
 
-That is, we calculate the densities of all $y_i$ using the parameters we obtain from the $n$ bayesian models, applying the loo-cv method. Then taking the logarithm and summing up. In the case at hand we deal with the normal density, since $y_i \sim \mathcal{N}\left(X_{(-i)}\beta_{(-i)}, \sigma^2_{(-i)}\right)$. Furthermore, multiplying with $-2$, i.e. $-2\ \text{lppd}_{\text{loo-cv}}$, gives us a measure that is comparable with other measures of predictive accuracy (e.g. AIC or WAIC) (Gelman, 2013). Besides the MSE we will use $-2\ \text{lppd}_{\text{loo-cv}}$ for model selection within the Bayesian framework.
+We first calculate the densities of all $y_i$ using the parameters we obtain from the $n$ bayesian models, applying the loo-cv method and then taking the logarithm and summing up. In our case we deal with the normal density, since $y_i \sim \mathcal{N}\left(X_{(-i)}\beta_{(-i)}, \sigma^2_{(-i)}\right)$. Furthermore, multiplying with $-2$, i.e. $-2\ \text{lppd}_{\text{loo-cv}}$, gives us a measure that is comparable with other measures of predictive accuracy (e.g. AIC or WAIC) (Gelman, 2013). Besides the MSE we will use $-2\ \text{lppd}_{\text{loo-cv}}$ for model selection within the Bayesian framework.
 
-Second, we will need it in the context of comparing the predictive out-of-sample accuracy of the Bayesian and the frequentist model using Cook's distance.
+Second, we will need it in the context of comparing the predictive out-of-sample accuracy of the bayesian and the frequentist model using Cook's distance.
 
 
 ## Cooks's Distance
@@ -125,7 +125,7 @@ Note that we only displayed the relevant code chunks in the `pdf` file. Some chu
 
 ## Basics
 
-The first function we define ist the *Gibbs sampler*. The Gibbs sampler draw the parameters $\beta_0, ..., \beta_p, \sigma^2$ from their posterior distributions. Those distributions (see equation \eqref{??} and \eqref{??}) need the design matrix `X` and labels `Y`, which are given as arguments. Furthermore the Gibbs sampler is not just drawing one time, it draws $B$ times, where $B = R + b$. $b$ is the number of burn in samples and $R$ the number of used samples. If $b = 0$, we use all generated samples.
+The first function we define ist the *Gibbs sampler*. The Gibbs sampler draws the parameters $\beta_0, ..., \beta_p, \sigma^2$ from their posterior distributions. Those distributions (see equation \eqref{??} and \eqref{??}) need the design matrix `X` and labels `Y`, which are given as arguments. Furthermore the Gibbs sampler is not just drawing one time, it draws $B$ times, where $B = R + b$. $b$ is the number of burn in samples and $R$ the number of used samples. If $b = 0$, we use all generated samples.
 
 In figure \ref{fig:traces} the traces of the Gibbs sampler is plotted for all parameters. It can be seen that the values, drawn by the sampler differ in some range. Moreover we can see that the initial value of $\sigma^2 = 1$ is corrected very fast to a specific range. The initial value of $\beta$ is directly drawn in the range where most values are generated.
 
@@ -187,9 +187,9 @@ gibbsSampler <- function(X, Y, R, b = 0, initSigma = 1) {
 }
 ```
 
-As next, we define a function doing the leave-one-out cross validation. It delets one data point and samples the parameters from the posterior distribution (using the `gibbsSampler` function). It is done $n$ times, where $n$ is the size (number of rows) of the data matrix, so there is a sampled posterior distribution for $n$ combinations of the data. Additionally the function estimates the posterior mean (point estimation) of the parameters and predict the labels, using the data matrix $X$ and the point esimtators of the parameters.
+As next, we define a function for the leave-one-out cross validation. It delets one data point and samples the parameters from the posterior distribution (using the `gibbsSampler` function). It is done $n$ times, where $n$ is the size (number of rows) of the data matrix, so there is a sampled posterior distribution for $n$ combinations of the data. Additionally the function estimates the posterior mean (point estimation) of the parameters and predicts the labels, using the data matrix $X$ and the point esimtators of the parameters.
 
-Note that the argument $R$ can be a scalar or a vector. If $R$ is a scalar, the cross validation just runs usual. If $R$ is a ordered vector the Gibbs sampler draws as often as the last value of the $R$ vector. The size of the vector is indicated by variable `steps`. Afterwards the calculation of the posterior mean and the prediction is done for every step in the vector $R$. In the first step, just the first $R_1$ number of samples are used to estimate the parameters. In the second step, $R_2 > R_1$ number of samples are used, and so on.
+Note that the argument $R$ can be a scalar or a vector. If $R$ is a scalar, the crossvalidation only runs once. If $R$ is an ordered vector the Gibbs sampler draws as often as the length of vector $R$. The length of vector R is saved in the variable steps. Afterwards the calculation of the posterior mean and the prediction is done for every step in the vector $R$. In the first step, just the first $R_1$ number of samples are used to estimate the parameters. In the second step, $R_2 > R_1$ number of samples are used, and so on.
 
 ```{r crossValidation}
 crossValidation <- function(X, Y, R, b) {
@@ -232,8 +232,7 @@ crossValidation <- function(X, Y, R, b) {
 ```
 
 ## Model evaluation
-
-The cross validation algorithm can be used to evaluate a *best* mode, where best means, that the mean squared error (mse), defined in equation \eqref{eq:mse} or the *lppd*, defined in equation \eqref{eq:lppd}, is the lowest, compared to the other models. Both measures are obtained by loo-cv.
+The cross validation algorithm can be used to evaluate the best mode. The best mode is found by looking for the smallest values compared to other models using the mean squared error, defined in equation \eqref{eq:mse} or the *lppd* , defined in equation \eqref{eq:lppd}. Both measures are obtained by loo-cv.
 
 The `bayesModelEvaluation` function calls the cross validation function for every model. Then for every model the *mse* and *lppd* is calculated and returned.
 
@@ -271,7 +270,7 @@ bayesModelEvaluation <- function(models, Y, R, b) {
 }
 ```
 
-To run the mode, we first chose `swiss` as a data set. We defined a list of 11 design matrices, containing different models. Afterwards the `bayesModelEvaluation` is called to run the cross validation and the calculation of *mse* and *lppd* for every model.
+To run the mode, we first used the `swiss` data set. We defined a list of 11 design matrices, containing different models. Afterwards the `bayesModelEvaluation` is called to run the cross validation and the calculation of *mse* and *lppd* for every model.
 
 ```{r modelEvaluation}
 # Swiss data
@@ -300,7 +299,7 @@ models <- list(
 criteria <- bayesModelEvaluation(models, Y, R = 50, b = 10) # R = 500, b = 100
 ```
 
-```{r plotModelEvaluationResults, echo=FALSE, fig.cap="\\label{fig:evalu}Model evaluation with leave-one-out cross validation (LOO-CV) using mean squared errors (MSE) and log posterior predictive density (lppd) to obtain best model.", fig.scap="Model evaluation with MSE and lppd", fig.align="center"}
+```{r plotModelEvaluationResults, echo=FALSE, fig.cap="\\label{fig:evalu}Model evaluation with leave-one-out cross validation (LOO-CV) using mean squared errors (MSE) and log posterior predictive density (lppd)to obtain the best model.", fig.scap="Model evaluation with MSE and lppd", fig.align="center"}
 par(mfrow = c(1,2))
 # Plot MSEs
 barplot(criteria$MSEs, xlab = "Models", ylab = "MSE", names.arg = seq(1,length(models)),
@@ -311,16 +310,16 @@ barplot(-2*criteria$LPPDs, xlab = "Models", ylab = "lppd", names.arg = seq(1,len
         main = "Model evaluation using lppd")
 ```
 
-The results in figure \ref{fig:evalu} show that model $9$ seems to be the best model with lowest *mse* and lowest *lppd*, compared to the other 10 models. To check this quantitatively we get the minimum of the *mse* values and the minimum of the *lppd* values.
+The results in figure \ref{fig:evalu} show that model $9$ seems to be the best model with the lowest *mse* and lowest the *lppd*, compared to the other 10 models. To check this quantitatively we get the minimum of the *mse* values and the minimum of the *lppd* values.
 
 ```{r}
 print(which.min(criteria$MSEs))
 print(which.min(-2*criteria$LPPDs))
 ```
 
-Indeed, both indicators favor model $9$. We need to know, that, according to Gelman (2013), *mse* is just appropriate if the model is more or less normally distributed. Furthermore if the models are normal and have constant variances, *mse* and *lppd* should have the same proportion.
+Indeed, both indicators favor model $9$. We now that according to Gelman (2013), *mse* is just appropriate if the model is more or less normally distributed. Furthermore if the models are normal and have constant variances, *mse* and *lppd* should have the same proportion.
 
-The proportions are calculated in table 1. It can be seen, that the proportion is in the same scale in all cases, but there are deviations. For exmaple in model $2$ and $9$ the proportions are very different. This is probably due to the fact, that all the models are not well normal distributed.
+The proportions are calculated in table 1. It can be seen, that the proportion is in the same scale in all cases, but there are deviations. For exmaple in model $2$ and $9$ the proportions are very different. This is probably due to the fact, that all the models are not well normally distributed.
 
 ```{r evaluateModelEvaluationTable, results="asis", echo=FALSE}
 # Check proportion
