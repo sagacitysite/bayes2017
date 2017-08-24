@@ -232,7 +232,7 @@ crossValidation <- function(X, Y, R, b) {
 ```
 
 ## Model evaluation
-The cross validation algorithm can be used to evaluate the best mode. The best mode is found by looking for the smallest values compared to other models using the mean squared error, defined in equation \eqref{eq:mse} or the *lppd* , defined in equation \eqref{eq:lppd}. Both measures are obtained by loo-cv.
+The cross validation algorithm can be used to evaluate the best model. The best mode is found by looking for the smallest values compared to other models using the mean squared error, defined in equation \eqref{eq:mse} or the *lppd* , defined in equation \eqref{eq:lppd}. Both measures are obtained by loo-cv.
 
 The `bayesModelEvaluation` function calls the cross validation function for every model. Then for every model the *mse* and *lppd* is calculated and returned.
 
