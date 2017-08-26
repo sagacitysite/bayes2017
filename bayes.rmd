@@ -77,10 +77,44 @@ library(mvtnorm)
 
 <!-- Document Body -->
 # Introduction
-Leave-on-out cross validation is one of many methods which is used after fitting a bayesian model to measure its predictive accuracy and also to chose the best model [1]. In practice it was not often used in the past due to the fact that it involves additional computation power and time as different models must be fitted in order to find the best model. 
-But there was a change in the last 10 to 15 years as computational power got cheaper and was therefore more available for the public. [2]
+
+Leave-on-out cross validation is one of many methods which is used after fitting a bayesian model to measure its predictive accuracy and also to chose the best model [@vehtari2017practical]. In practice it was not often used in the past due to the fact that it involves additional computation power and time as different models must be fitted in order to find the best model.  
+But there was a change in the last 10 to 15 years as computational power got cheaper and was therefore more available for the public [@hoeting1998bayesian].  
 In the following paper model evaluation is done by calculating the mean squared error of the model as well as the log posterior predictive density. The best model is then selected by looking for the smallest values of those calculated parameters. In the second part of the model evaluation Cook’s distance is calculated by using two different methods for a comparison. For method one we use the leave-on-out cross validation bayesian approach and compare it with method two the analytic solution for a frequentist approach.
+
 # Theory
+
+## Bayesian Linear Model
+
+We want to express the conditional value of $\mathbf{y}$ given $\mathbf{X}$ as a linear function of the nxk-matrix $\mathbf{X}$, where k is the number of independent variables included.  
+This may be written as:
+
+\begin{equation}
+	\mathbf{y}=\mathbf{X}\beta + \epsilon 
+\end{equation}
+
+If we assume normally distributed errors $\epsilon$ this yields the following Likelihood function:
+
+\begin{equation}
+	L(\beta, \sigma^2, \mathbf{y}, \mathbf{X}) =  p(\mathbf{y}|\beta, \sigma^2, \mathbf{X}) = \Big(\frac{1}{2\pi{\sigma^2}}\Big) e^{-\frac{1}{2\sigma^2}(\mathbf{y}-\mathbf{X}\beta)'(\mathbf{y}-\mathbf{X}\beta)}
+\end{equation}
+
+Solving for $\beta$ would yield the frequentist OLS-estimator $\hat{\beta} = \mathbf{(X'X)^{-1}X'y}$. However, in a Bayesian approach we are not so much concerned with finding specific values for the coefficient vector $\beta$, but rather being able to comment on the probability distribution of $\beta$. Normalising for $(\beta-\hat{\beta})$ gives us:
+
+\begin{equation} \label{likeli} \setlength{\jot}{10pt}
+\begin{aligned}
+	p(\mathbf{y}|\beta, \sigma^2, \mathbf{X}) {} & = \big(\frac{1}{2\pi}\big)^{\frac{n}{2}} \sigma^{-n} e^{-\frac{1}{2\sigma^2}\big[vs^2+(\beta-\hat{\beta})'\mathbf{X'X}(\beta-\hat{\beta})\big]} \\
+	& \propto{\sigma^{-n}} e^{-\frac{vs^2}{2\sigma^2}} e^{-\frac{1}{2\sigma^2}\big[(\beta-\hat{\beta})\mathbf{X'X}(\beta-\hat{\beta})\big]} \\
+\end{aligned}
+\end{equation}
+
+where $vs^2=(\mathbf{y}-\mathbf{X}\hat{\beta})'(\mathbf{y}-\mathbf{X}\hat{\beta})$ and $v=n-k$.
+
+Applying a prior distribution for $\beta$ and $\sigma^2$; $p(\beta, \sigma^2)$ yields the posterior distribution for $\beta$ and $\sigma^2$, which is a distribution that has been updated by the actual observed data represented by $\mathbf{y}$ and $\mathbf{X}$. In this case, the conjugate prior to a likelihood as seen in equation \ref{likeli} is an inverse-gamma distribution for $\sigma^2$. Thus, the prior would be of the type $p(\beta, \sigma^2)=p(\beta|\sigma^2)p(\sigma^2)$, where $p(\sigma^2)$ is inverse-gamma distributed. Using Bayes' Theorem, the posterior distribution may now be derived by solving the following term:
+
+\begin{equation}
+	p(\beta, \sigma^2 | \mathbf{y, X}) \propto p(\mathbf{y} | \beta, \sigma^2, \mathbf{X}) p(\beta|\sigma^2) p(\sigma^2) 
+\end{equation}
 
 ## Leave-one-out cross-validation
 
