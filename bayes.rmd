@@ -172,7 +172,7 @@ Furthermore in figure \ref{fig:densities} the histogram and the extimated densit
 Both figures are based on data for the whole dataset of the optimal model (see below).
 
 ```{r gibbsSampler}
-gibbsSampler <- function(X, Y, R, b = 0, initSigma = 1) {
+gibbsSampler <- function(X, Y, R, b = 0, initBetas = 1) {
   # Sample parameters from posterior distribution
   # Prepared for baysean linear regression with ordinary least square approach (OLS)
   #
@@ -181,7 +181,7 @@ gibbsSampler <- function(X, Y, R, b = 0, initSigma = 1) {
   #   Y: Labels
   #   R: Number of draws (without burn in), R is a scalar in this funcrion
   #   b: Number of burn in draws
-  #   initSigma: Initial value of sigma (default 1)
+  #   initBetas: Initial value of betas (default 1)
   #
   # Returns:
   #   List containing sampled betas (number depends on design matrix) and sigmas
@@ -193,25 +193,28 @@ gibbsSampler <- function(X, Y, R, b = 0, initSigma = 1) {
   n <- nrow(X) # Number of data points
   p <- ncol(X) # Number of parameters
   
-  # Variables to store the samples in (initalize sigma with initSigma)
+  # Variables to store the samples in
   betas <- matrix(nrow = B, ncol = p)
-  sigma <- c(initSigma, rep(NA, B-1))
+  sigma <- rep(NA, B)
+  
+  # OLS of beta
+  V <- solve(t(X)%*%X)     # (X^T X)^-1
+  beta_hat <- V%*%t(X)%*%Y # (X^T X)^-1 X^T Y
+  
+  # Initalize betas and sigma
+  betas[1,] <- 1
+  #betas[1,] <- beta_hat
+  sigma[1] <- 1
   
   # Sampling
-  for(i in 1:B){
-    # OLS of beta
-    V <- solve(t(X)%*%X)     # (X^T X)^-1
-    beta_hat <- V%*%t(X)%*%Y # (X^T X)^-1 X^T Y
-    
-    # OLS of sigma
-    sigma_hat <- t(Y-X%*%beta_hat)%*%(Y-X%*%beta_hat)/(n-p)
+  for(i in 1:(B-1)){
+    # Sample sigma from the full conditional
+    counter <- t(Y-X%*%betas[i,])%*%(Y-X%*%betas[i,])
+    sigma[i+1] <- 1/rgamma(1, n/2, counter/2)
     
     # Sample beta from the full conditional 
-    betas[i,] <- rmvnorm(1, beta_hat, sigma[i]*V)
-    
-    # Sample sigma from the full conditional
     if(i < B) {
-      sigma[i+1] <- 1/rgamma(1, (n-p)/2, (n-p)*sigma_hat/2)
+      betas[i+1,] <- rmvnorm(1, beta_hat, sigma[i+1]*V)
     }
   }
   
