@@ -78,7 +78,7 @@ library(mvtnorm)
 <!-- Document Body -->
 # Introduction
 
-Leave-on-out cross validation is one of many methods which is used after fitting a bayesian model to measure its predictive accuracy and also to chose the best model [@vehtari2017practical]. In practice it was not often used in the past due to the fact that it involves additional computation power and time as different models must be fitted in order to find the best model.  
+Leave-on-out cross validation is one of many methods which is used after fitting a bayesian model to measure its predictive accuracy and also to choose the best model [@vehtari2017practical]. In practice it was not often used in the past due to the fact that it involves additional computation power and time as different models must be fitted in order to find the best model.  
 But there was a change in the last 10 to 15 years as computational power got cheaper and was therefore more available for the public [@hoeting1998bayesian].  
 In the following paper model evaluation for several Bayesian linear models is done by calculating the mean squared error of the model as well as the log pointwise predictive density. The best model is then selected by looking for the smallest values of those calculated measures. Further, the selected model will be calculated using the frequentist approach and then be compared to the Bayesian model using 
 Cook's Distance. In both steps Leave-on-out cross validation is required to derive these measures.
@@ -164,7 +164,7 @@ Both figures are based on data for the whole dataset of the optimal model (see b
 ```{r gibbsSampler}
 gibbsSampler <- function(X, Y, R, b = 0, initBetas = 1) {
   # Sample parameters from posterior distribution
-  # Prepared for baysean linear regression with ordinary least square approach (OLS)
+  # Prepared for baysean linear regression with ordinary least square approach
   #
   # Args:
   #   X: Design matrix
@@ -199,7 +199,7 @@ gibbsSampler <- function(X, Y, R, b = 0, initBetas = 1) {
   for(i in 1:(B-1)){
     # Sample sigma from the full conditional
     counter <- t(Y-X%*%betas[i,])%*%(Y-X%*%betas[i,])
-    sigma[i+1] <- 1/rgamma(1, n/2, counter/2)
+    sigma[i+1] <- 1/rgamma(1, (n-p)/2, counter/2)
     
     # Sample beta from the full conditional 
     if(i < B) {
@@ -229,11 +229,13 @@ crossValidation <- function(X, Y, R, b) {
   # Args:
   #   X: Design matrix
   #   Y: Labels
-  #   R: Number of draws (without burn-in), R can be a vector (ordered) in this function
+  #   R: Number of draws (without burn-in), R can be a
+  #      (ordered) vector in this function
   #   b: Number of burn-in draws
   #
   # Returns:
-  #   List containing estimated parameters and label predictions for every LOO-CV step
+  #   List containing estimated parameters and
+  #   label predictions for every LOO-CV step
   
   # Size of design matrix
   n <- nrow(X) # Number of data points 
@@ -294,7 +296,9 @@ bayesModelEvaluation <- function(models, Y, R, b) {
   
   # Calculate log pointwise predictive density (log likelihood)
   # y ~ N(XB, s^2(X^T X)^-1) = N(Yhat, s^2(X^T X)^-1)
-  LPPDs <- sapply(results, function(eva) sum(log(dnorm(Y, eva$Yhati[[1]], eva$Sigma[[1]]))))
+  LPPDs <- sapply(results, function(eva) {
+      return(sum(log(dnorm(Y, eva$Yhati[[1]], eva$Sigma[[1]]))))
+    })
   
   return(list(MSEs = MSEs, LPPDs = LPPDs))
 }
@@ -322,7 +326,8 @@ models <- list(
   matrix(c(rep(1,n), dat$Education, dat$Agriculture, dat$Examination), nrow=n),
   matrix(c(rep(1,n), dat$Education, dat$Agriculture, dat$Catholic), nrow=n),
   matrix(c(rep(1,n), dat$Education, dat$Examination, dat$Catholic), nrow=n),
-  matrix(c(rep(1,n), dat$Education, dat$Agriculture, dat$Examination ,dat$Catholic), nrow=n)
+  matrix(c(rep(1,n), dat$Education, dat$Agriculture, dat$Examination ,dat$Catholic),
+         nrow=n)
 )
 
 # Run model evaluation
@@ -411,7 +416,8 @@ plotDensities <- function(sample, b) {
   
   # Function to draw plot
   drawHistDensity <- function(para, para_name, para_main) {
-    # Local helper function to plot histogram with density esimtation and posterior mean
+    # Local helper function to plot histogram with density esimtation
+    # and posterior mean
     #
     # Args:
     #   para     : Parameter (e.g. Beta, Sigma)
@@ -471,9 +477,11 @@ cooksDistance <- function(X, Y, R, b) {
   #
   # Returns:
   #   cooksBayesCV:   Cook's distances calculated by LOO-CV (bayes model),
-  #                   where cook's distances are calculated for different sample sizes
+  #                   where cook's distances are calculated for different
+  #                   sample sizes
   #   cooksAnalytic:  Cook's distances calculated by analytic solution
-  #   sample:         The gibbs sample from the bayes linear model (for plotting purpose)
+  #   sample:         The gibbs sample from the bayes linear model
+  #                   (for plotting purpose)
   
   # R is usually a vector (but don't has to)
   B <- R + b
@@ -512,7 +520,9 @@ cooksDistance <- function(X, Y, R, b) {
     cooksBayesCV[,k] <- colSums(dists)/(p*mse)
   }
   
-  return(list(cooksBayesCV = cooksBayesCV, cooksAnalytic = cooksAnalytic, sample = sample))
+  return(list(cooksBayesCV = cooksBayesCV,
+              cooksAnalytic = cooksAnalytic,
+              sample = sample))
 }
 ```
 
