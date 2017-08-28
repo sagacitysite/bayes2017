@@ -80,8 +80,7 @@ library(mvtnorm)
 
 Leave-on-out cross validation is one of many methods which is used after fitting a bayesian model to measure its predictive accuracy and also to choose the best model [@vehtari2017practical]. In practice it was not often used in the past due to the fact that it involves additional computation power and time as different models must be fitted in order to find the best model.  
 But there was a change in the last 10 to 15 years as computational power got cheaper and was therefore more available for the public [@hoeting1998bayesian].  
-In the following paper model evaluation for several Bayesian linear models is done by calculating the mean squared error of the model as well as the log pointwise predictive density. The best model is then selected by looking for the smallest values of those calculated measures. Further, the selected model will be calculated using the frequentist approach and then be compared to the Bayesian model using 
-Cook's Distance. In both steps Leave-on-out cross validation is required to derive these measures.
+In the following paper model evaluation for several Bayesian linear models is done by calculating the mean squared error of the model as well as the log pointwise predictive density. The best model is then selected by looking for the smallest values of those calculated measures. Further, the selected model will be calculated using the frequentist approach. Finally the Bayesian model and the frequentist model will be compared using Cook's Distance. In both steps Leave-on-out cross validation is required to derive these measures.
 
 
 # Theory
@@ -89,7 +88,7 @@ Cook's Distance. In both steps Leave-on-out cross validation is required to deri
 ## Bayesian Linear Model
 
 With linear models we want to express the conditional value of a variable $y$ given $X$ as a linear function of $X$.
-The classical linear regression model is defined as
+The classical linear regression model is defined as:
 \begin{equation}
 	y = X\beta + \epsilon,
 \end{equation}
@@ -102,7 +101,7 @@ Only dealing with $\beta$ and $\sigma^2$ and further assume prior independence f
   \frac{1}{\sigma^2}|\beta,y,X & \sim \Gamma\left( \frac{n-p}{2}, \frac{(y-X\beta)^\top(y-X\beta)}{2} \right). \label{eq:sigma_dist}
 \end{align}
 Instead of modeling $\sigma^2$ as \textit{inverse-}$\chi^2$ distributed as proposed by [@gelman2014bayesian], we will follow [@hoff2009first] and model $\frac{1}{\sigma^2}$ as $\Gamma$ distributed.
-Having the full conditionals we can apply the Gibbs sampling method to get draws from the conditional posteriors and to derive the expected values for $\beta$ and $\sigma^2$ as Bayesian estimates.
+Having the full conditionals we can apply the Gibbs sampling method to draw observations from the conditional posteriors and to derive the expected values for $\beta$ and $\sigma^2$ as Bayesian estimates.
 
 
 ## Gibbs sampling
