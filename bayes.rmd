@@ -113,7 +113,7 @@ Repeating this procedure yields in drawing from the joint posterior distribution
 
 ## Leave-one-out cross-validation
 
-\textit{Leave-one-out cross-validation}, or short \textit{loo-cv} is a method for checking the predictive out-of-sample accuracy of a model. The idea is to omit the $i$-th observation and to fit the model for the remaining observations and then to predict $y_i$  as an out of sample point. This prediction is denoted as $\hat{y}_i^{(i)}$. Thus, we can overcome -- at least to some extent -- the problem of overfitting. The loo-cv method can be used in several ways for model evaluation and selection. We will use it in two ways. First, we will use it to calculate the \textit{log pointwise predictive density} using the loo-cv, which is defined as
+\textit{Leave-one-out cross-validation}, or short \textit{loo-cv} is a method for checking the predictive out-of-sample accuracy of a model. The idea is to omit the $i$-th observation and to fit the model for the remaining observations and then to predict $y_i$  as an out of sample point. This prediction is denoted as $\hat{y}_i^{(i)}$. Thus, we can overcome -- at least to some extent -- the problem of overfitting. The loo-cv method can be used in several ways for model evaluation and selection. We will use it in two ways. First, we will use it to calculate the \textit{log pointwise predictive density} using the loo-cv, which is defined as:
 \begin{equation}
   \label{eq:lppd}
 	\text{lppd}_{\text{loo-cv}} = \sum\limits_{i=1}^{n} \log p_{\text{dens}(-i)}(y_i).
@@ -125,7 +125,7 @@ Second, we will need it in the context of comparing the predictive out-of-sample
 
 ## Cook's Distance
 
-\textit{Cooks's Distance}, or short \textit{Cook's D}, is a measure to detect influential points in a linear regression. It was proposed by [@cook1977detection] and is defined as
+\textit{Cooks's Distance}, or short \textit{Cook's D}, is a measure to detect influential points in a linear regression. It was proposed by [@cook1977detection] and is defined as:
 \begin{equation}
   \label{eq:cookd}
 	D_i = \frac{\sum_{j=1}^{n}\left(\hat{y}_j - \hat{y}_j^{(i)}\right)^2}{p\ \text{MSE}} \stackrel{\text{(OLS)}}=
@@ -561,7 +561,7 @@ for(i in sampleSizeToPlot) {
 }
 ```
 
-To see the convergence behavior of the loo-cv solution to the analytic solution, we developed a measure $d$ caluclating the distance between both solutions. The Cook's distance value for both solutions were subtracted, squared and summed (squared distance) as follows
+To see the convergence behavior of the loo-cv solution to the analytic solution, we developed a measure $d$ caluclating the distance between both solutions. The Cook's distance value for both solutions were subtracted, squared and summed (squared distance) as follows:
 
 \begin{equation}
 d = \sum_{i=1}^n (D^\text{loo-cv}_i - D^\text{analytic}_i)^2,
