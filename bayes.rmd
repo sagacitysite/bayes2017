@@ -330,7 +330,7 @@ models <- list(
 )
 
 # Run model evaluation
-criteria <- bayesModelEvaluation(models, Y, R = 50, b = 10) # R = 500, b = 100
+criteria <- bayesModelEvaluation(models, Y, R = 500, b = 100)
 ```
 
 ```{r plotModelEvaluationResults, echo=FALSE, fig.cap="\\label{fig:evalu}Model evaluation with leave-one-out cross validation (LOO-CV) using mean squared errors (MSE) and log pointwise predictive density (lppd)to obtain the best model.", fig.scap="Model evaluation with MSE and lppd", fig.align="center"}
@@ -530,7 +530,7 @@ We apply the function above to the optimal model, obtained by the model evaluati
 ```{r cooksDistance}
 # Number of samples
 b <- 100
-R <- seq(100,500,50) # seq(100,5000,50)
+R <- seq(100,5000,50)
 
 # Get optimal model and calculate projection matrix
 cooks <- cooksDistance(models[[optIdx]], Y, R, b)
@@ -581,7 +581,7 @@ cooksMeasure <- colSums((matBayesD-matFreqD)^2)
 
 In figure \ref{fig:cookdmeasure} we can see that the defined distance $d$ becomes lower. In other words: both solutions are coming closer together the more simulations are done. Therefore a convergence behavior can be seen.
 
-```{r plotCookDistancesMeasure, echo=FALSE, fig.cap="\\label{fig:cookdmeasure}Cook's distance measure to quantify approximation from cross validated cook's distances of analytic cook's distances. The approximate solution with LOO-CV comes closer to the analytic solution, the more samples are drawn.", fig.scap="Cook's distance measure for approximation of analytic solution by LOO-CV solution", fig.align="center"}
+```{r plotCookDistancesMeasure, echo=FALSE, fig.height=7, fig.cap="\\label{fig:cookdmeasure}Cook's distance measure to quantify approximation from cross validated cook's distances of analytic cook's distances. The approximate solution with LOO-CV comes closer to the analytic solution, the more samples are drawn.", fig.scap="Cook's distance measure for approximation of analytic solution by LOO-CV solution", fig.align="center"}
 # Plot differences between Cook's distance for different sample sizes
 par(mfrow = c(1,1))
 barplot(cooksMeasure, xlab="Sample size", ylab="Difference measure", names.arg=R,
