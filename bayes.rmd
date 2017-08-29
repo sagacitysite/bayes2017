@@ -29,10 +29,6 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ```{r libraries, echo=FALSE, warning=FALSE, message=FALSE}
-#library(MASS)
-#library(mixtools)
-#library(plyr)
-library(xtable)
 library(mvtnorm)
 ```
 
@@ -72,7 +68,6 @@ library(mvtnorm)
 
 <!-- List of Figures and Tables -->
 \listoffigures
-\listoftables
 \newpage
 
 <!-- Document Body -->
@@ -263,6 +258,7 @@ crossValidation <- function(X, Y, R, b) {
 ```
 
 ## Model evaluation
+
 The cross validation algorithm can be used to evaluate the best model. The best mode is found by looking for the smallest values compared to other models using the mean squared error, defined in equation \eqref{eq:mse} or the *lppd* , defined in equation \eqref{eq:lppd}. Both measures are obtained by loo-cv.
 
 The `bayesModelEvaluation` function calls the cross validation function for every model. Then for every model the *mse* and *lppd* is calculated and returned.
@@ -351,18 +347,7 @@ print(which.min(criteria$MSEs))
 print(which.min(-2*criteria$LPPDs))
 ```
 
-Indeed, both indicators favor model $9$. We know that according to [@gelman2014bayesian], *mse* is just appropriate if the model is more or less normally distributed. Furthermore if the models are normal and have constant variances, *mse* and *lppd* should have the same proportion.
-
-The proportions are calculated in table 1. It can be seen, that the proportion is in the same scale in all cases, but there are deviations. For exmaple in model $2$ and $9$ the proportions are very different. This is probably due to the fact, that all the models are not well normally distributed.
-
-```{r evaluateModelEvaluationTable, results="asis", echo=FALSE}
-# Check proportion
-prop <- matrix(criteria$MSEs/(-2*criteria$LPPDs), ncol = length(models),
-               dimnames = list("proportion", seq(1,length(models))))
-print(xtable(prop, caption = "Proportion of mse and lppd."), comment = FALSE)
-```
-
-Finally we store the index of the optimal model in a variable. In the next step we want to calculate Cook's distance just for the best mode.
+Indeed, both indicators favor model $9$. Finally we store the index of the optimal model in a variable. In the next step we want to calculate Cook's distance just for the best mode.
 
 ```{r chooseOptimal}
 # Choose optimal modal
