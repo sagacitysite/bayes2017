@@ -50,7 +50,7 @@ library(mvtnorm)
 
 \vspace*{\fill}
   \begin{center}
-    \textbf{\Large{Program leave-one-out pointwise predictive checking in R}}%
+    \textbf{\Large{Program leave-one-out posterior predictive checking in R}}%
   \end{center}
 \vfill
 
@@ -303,7 +303,7 @@ bayesModelEvaluation <- function(models, Y, R, b) {
 }
 ```
 
-To run the mode, we first used the `swiss` data set. We defined a list of 11 design matrices, containing different models. Afterwards the `bayesModelEvaluation` is called to run the cross validation and the calculation of *mse* and *lppd* for every model.
+To run the model, we first used the `swiss` data set. We defined a list of 11 design matrices, containing different models. Afterwards the `bayesModelEvaluation` is called to run the cross validation and the calculation of *mse* and *lppd* for every model.
 
 ```{r modelEvaluation}
 # Swiss data
@@ -344,14 +344,14 @@ barplot(-2*criteria$LPPDs, xlab = "Models", ylab = "lppd", names.arg = seq(1,len
         main = "Model evaluation using lppd")
 ```
 
-The results in figure \ref{fig:evalu} show that model $9$ seems to be the best model with the lowest *mse* and lowest the *lppd*, compared to the other 10 models. To check this quantitatively we get the minimum of the *mse* values and the minimum of the *lppd* values.
+The results in figure \ref{fig:evalu} show that model $9$ seems to be the best model with the lowest *mse* and the lowest *lppd*, compared to the other 10 models. To check this quantitatively we get the minimum of the *mse* values and the minimum of the *lppd* values.
 
 ```{r}
 print(which.min(criteria$MSEs))
 print(which.min(-2*criteria$LPPDs))
 ```
 
-Indeed, both indicators favor model $9$. We now that according to [@gelman2014bayesian], *mse* is just appropriate if the model is more or less normally distributed. Furthermore if the models are normal and have constant variances, *mse* and *lppd* should have the same proportion.
+Indeed, both indicators favor model $9$. We know that according to [@gelman2014bayesian], *mse* is just appropriate if the model is more or less normally distributed. Furthermore if the models are normal and have constant variances, *mse* and *lppd* should have the same proportion.
 
 The proportions are calculated in table 1. It can be seen, that the proportion is in the same scale in all cases, but there are deviations. For exmaple in model $2$ and $9$ the proportions are very different. This is probably due to the fact, that all the models are not well normally distributed.
 
@@ -457,7 +457,7 @@ The second application of the cross validation is the approximate calculation of
 
 To calculate the approximation of Cook's distance with cross validation we make use of the implemented `crossValidation` function above. We choose `R` as a vector, such that the cross validation function calculates multiple estimates for many different sample sizes. Finally we just apply the formula for Cook's distance.
 
-For the analytic solution, we calculate a frequentist linear regression, where `\hat\beta` was solved by ordinary least square approach. After we obtain the point estimation, we can calculate Cook's distance.
+For the analytic solution, we calculate a frequentist linear regression, where $\hat\beta$ was solved by ordinary least square approach. After we obtain the point estimatie, we can calculate Cook's distance.
 
 In the end a list is returned, containing the analytic solution as a vector and the loo-cv solutions as a matrix, where the number of columns depend on the size of vector `R`.
 
@@ -546,7 +546,7 @@ plotTraces(cooks$sample)
 plotDensities(cooks$sample, b)
 ```
 
-In the first step, we want to have a look at Cook's distances. In figure \ref{fig:cookd} the blue bars in all 3 plots are always the same analytic solution. They are compared to the the loo-cv solution using Bayes approach, which is shown in red. In the first plot `r R[1]` simulations were conducted, in the second plot `r R[round(length(R)/5)]` and `r R[length(R)]` in the last plot. We can observe, that the more simulation are done the loo-cv solution is coming closer to the analytic solution.
+In the first step, we want to have a look at Cook's distances. In figure \ref{fig:cookd} the blue bars in all 3 plots are always the same analytic solution. They are compared to the loo-cv solution using the Bayes approach, which is shown in red. In the first plot `r R[1]` simulations were conducted, in the second plot `r R[round(length(R)/5)]` and `r R[length(R)]` in the last plot. We can observe, that the more simulation are done the loo-cv solution is coming closer to the analytic solution.
 
 ```{r plotCookDistances, echo=FALSE, fig.height=10, fig.cap="\\label{fig:cookd}Pointwise cook's distance, calculated with three different sample sizes, compared to analytic cook's distance from frequentist linear regression model using least squares.", fig.scap="Pointwise cook's distance comparison between COO-LV and analytic solution", fig.align="center"}
 # Plot Cook's distances pointwise for 3 sample sizes
